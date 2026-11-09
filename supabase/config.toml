@@ -1,0 +1,10 @@
+project_id = "merlo-ya"
+
+[functions.create-transfer-order]
+verify_jwt = true
+
+[functions.review-transfer-payment]
+verify_jwt = true
+
+[functions.submit-transfer-proof]
+verify_jwt = true

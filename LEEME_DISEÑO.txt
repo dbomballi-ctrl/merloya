@@ -1,0 +1,25 @@
+MERLO YA — VERSION DE DISEÑO RESTAURADO
+
+IMPORTANTE: descomprimir el ZIP completo y abrir index.html desde la carpeta descomprimida.
+No mover index.html fuera de su carpeta: utiliza logo.png y recursos locales ubicados en merlo_ya_assets/.
+
+CAMBIOS VISUALES
+- Nuevo encabezado con logo original y eslogan.
+- Selector de localidad, botones de acceso y acceso rápido al carrito.
+- Banner panorámico de las sierras.
+- Carrusel de locales destacados con fotografías.
+- Buscador y filtros por localidad/categoría.
+- Grilla de comercios con portadas fotográficas.
+- Carrito lateral que muestra productos seleccionados.
+- Pie de página y estilos responsive para móviles.
+
+FUNCIONALIDAD CONSERVADA
+Se conservaron los formularios, modales, funciones existentes, integración Supabase, paneles y código de Mercado Pago/Edge Functions del proyecto.
+
+PRUEBAS REALIZADAS
+- Validación sintáctica de los scripts JavaScript incluidos.
+- Parseo del HTML y revisión de IDs duplicados.
+- Verificación de presencia de imágenes y recursos dentro del ZIP.
+
+PENDIENTE DE VALIDACIÓN EN EL ENTORNO REAL
+No se pudo probar el renderizado final en un navegador interactivo ni realizar autenticación/pagos contra Supabase y Mercado Pago desde este entorno. Esas pruebas requieren abrir el proyecto en un navegador y disponer de las credenciales y funciones desplegadas.

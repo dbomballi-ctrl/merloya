@@ -1044,7 +1044,15 @@
     btn.disabled=true;btn.textContent='Creando pedido…';
     try{
       const {data,error}=await _supabase.functions.invoke('create-transfer-order',{body:{delivery_address:address,delivery_zone:zone,delivery_latitude:lat,delivery_longitude:lon,customer_phone:phone,items}});
-      if(error)throw new Error(error.message||'No se pudo crear el pedido.');
+      if(error)throw new Error(error.message||'No se pudo crear el pedido
+      // Disparar notificación automática por WhatsApp (CallMeBot)
+      try {
+        const nombreComercioPrincipal = currentLines()[0]?.merchant?.nombre || 'Comercio Asociado';
+        const telefonoAdminPrincipal = '5492656400000'; // Reemplazá con tu número de WhatsApp
+        enviarWhatsAppPedido(data.order_id, nombreComercioPrincipal, phone, address, data.total, telefonoAdminPrincipal);
+      } catch(wspErr) {
+        console.error('Error al intentar disparar WhatsApp:', wspErr);
+      }
       if(!data?.order_id||!Array.isArray(data.payments))throw new Error(data?.error||'Respuesta incompleta del servidor.');
       const result=document.getElementById('transfer-payment-results');
       result.innerHTML=`<h3>Pedido creado correctamente</h3><p><b>Número:</b> ${esc(data.order_id)}</p><p>Productos: ${money(data.subtotal)} · Envíos: ${money(data.shipping_total)} · <b>Total: ${money(data.total)}</b></p>`+

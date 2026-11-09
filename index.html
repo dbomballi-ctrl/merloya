@@ -1054,8 +1054,22 @@
       result.style.display='block';document.getElementById('checkout-fields').style.display='none';btn.style.display='none';cart.clear();refreshCart();
     }catch(e){console.error(e);mostrarFeedback('msg-checkout',e.message||'No se pudo crear el pedido.',true);btn.disabled=false;btn.textContent='Generar pedido y ver transferencias';}
     finally{btn.disabled=false;if(btn.style.display!=='none')btn.textContent='Generar pedido y ver transferencias';}
-  };
-  window.subirComprobanteTransferencia=async function(paymentId){
+// Dentro del try, justo después de mostrar que el pedido se creó correctamente (ej. línea 54):
+    
+    // Armamos el objeto con los datos reales que devolvió Supabase
+    const datosPedidoWhatsApp = {
+      id: data.order_id,
+      nombre_comercio: data.merchant_orders?.[0]?.merchant_name || 'Comercio',
+      nombre_cliente: document.getElementById('nombre-cliente')?.value || 'Cliente', // o el campo de tu form
+      telefono_cliente: document.getElementById('telefono-cliente')?.value || '-',
+      direccion_entrega: address || 'Dirección no especificada',
+      monto_comercio: data.merchant_orders?.[0]?.total || 0,
+      monto_envio: data.shipping_total || 0,
+      monto_total: data.total || 0
+    };
+
+    // Llamamos a la función de WhatsApp con los datos reales
+    enviarWhatsAppPedido(datosPedidoWhatsApp, 'admin', '5491126306785');
     const input=document.getElementById('proof-'+paymentId);const status=document.getElementById('proof-status-'+paymentId);const file=input?.files?.[0];
     if(!file){status.textContent='Seleccioná un archivo primero.';return;}
     if(file.size>5*1024*1024||!['image/jpeg','image/png','application/pdf'].includes(file.type)){status.textContent='Archivo inválido. Usá JPG, PNG o PDF de hasta 5 MB.';return;}

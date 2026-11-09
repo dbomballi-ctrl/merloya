@@ -738,7 +738,7 @@
       }
     }
 
-    async function cargarPanelComercio(profile) {
+async function cargarPanelComercio(profile) {
       perfilLogueado = profile;
       document.getElementById('edit-com-nombre').value = profile.nombre || '';
       document.getElementById('edit-com-rubro').value = profile.rubro || 'Gastronomía';
@@ -747,15 +747,17 @@
       document.getElementById('edit-com-wsp').value = profile.whatsapp || '';
 
       await cargarProductosDB();
-      // El flujo actual usa transferencias bancarias; no se inicia transferencia bancaria.
-      if (window.cargarPedidosComercio) await window.cargarPedidosComercio();
+      if (window.cargarDatosComercioTransferencias) await window.cargarDatosComercioTransferencias();
     }
 
     async function cargarProductosDB() {
+      if (!perfilLogueado) return;
       const { data, error } = await _supabase.from('products').select('*').eq('comercio_id', perfilLogueado.id);
       if(!error) {
         productosComercioLogueado = data || [];
         renderABMProductos();
+      } else {
+        console.error('Error al cargar productos:', error.message);
       }
     }
 

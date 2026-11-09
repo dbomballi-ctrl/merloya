@@ -784,7 +784,45 @@
 
       if(!nombre || !precio) {
         mostrarFeedback('msg-panel-comercio', 'Ingresá nombre y precio.', true);
-        return;
+        return;function renderABMProductos() {
+  const contenedor = document.getElementById('lista-abm-productos');
+  contenedor.innerHTML = '';
+
+  if (productosComercioLogueado.length === 0) {
+    contenedor.innerHTML = '<p style="color:#666; margin:0;">No tenés productos en el catálogo.</p>';
+    return;
+  }
+
+  productosComercioLogueado.forEach((p) => {
+    const disponible = p.disponible !== false;
+    contenedor.innerHTML += `
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #eee;">
+        <div>
+          <b>${p.nombre}</b> - $${p.precio}
+          <span style="font-size:12px; margin-left:8px; color:${disponible ? '#22a765' : '#d9534f'};">
+            ${disponible ? '● Disponible' : '● Agotado'}
+          </span>
+        </div>
+        <div style="display:flex; gap:6px;">
+          <button onclick="cambiarEstadoProductoDB('${p.id}', ${!disponible})" style="background:${disponible ? '#f0ad4e' : '#22a765'}; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;">
+            ${disponible ? 'Pausar' : 'Activar'}
+          </button>
+          <button onclick="eliminarProductoDB('${p.id}')" style="background:#d9534f; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;">Eliminar</button>
+        </div>
+      </div>
+    `;
+  });
+}
+
+async function cambiarEstadoProductoDB(id, nuevoEstado) {
+  const { error } = await _supabase.from('products').update({ disponible: nuevoEstado }).eq('id', id);
+  if (error) mostrarFeedback('msg-panel-comercio', 'Error: ' + error.message, true);
+  else {
+    mostrarFeedback('msg-panel-comercio', '✅ Estado de producto actualizado.');
+    await cargarProductosDB();
+    await cargarComercios();
+  }
+}
       }
 
       const { error } = await _supabase.from('products').insert([{
@@ -1156,69 +1194,59 @@ if(error) throw new Error(error.message || 'No se pudo crear el pedido');
     perfilLogueado.latitude=lat;perfilLogueado.longitude=lon;
     mostrarFeedback('msg-panel-comercio','Cuenta de transferencia y ubicación guardadas correctamente.');
   };
-  async function cargarDatosComercioTransferencias(){
-    if(!perfilLogueado||perfilLogueado.role!=='comercio')return;
-    const {data}=await _supabase.from('merchant_payment_accounts').select('account_holder,bank_name,alias,cbu').eq('merchant_id',perfilLogueado.id).maybeSingle();
-    if(data){document.getElementById('merchant-account-holder').value=data.account_holder||'';document.getElementById('merchant-bank-name').value=data.bank_name||'';document.getElementById('merchant-bank-alias').value=data.alias||'';document.getElementById('merchant-bank-cbu').value=data.cbu||'';}
-    document.getElementById('merchant-latitude').value=perfilLogueado.latitude??'';
-    document.getElementById('merchant-longitude').value=perfilLogueado.longitude??'';
-  }
-  window.cargarDatosComercioTransferencias=cargarDatosComercioTransferencias;
-  window.addEventListener('load',refreshCart);
-})();
-</script>
-
-<script>
 async function cargarDashboardAdmin() {
   const container = document.getElementById("admin-orders-list");
   if (!container) return;
   container.innerHTML = "Cargando pedidos recientes...";
 
   try {
-    // Consultamos los últimos pedidos con sus pagos asociados usando el cliente de Supabase global
     const { data: orders, error } = await supabase
       .from("orders")
       .select(`
-        id,
-        created_at,
-        subtotal,
-        shipping_total,
-        total_amount,
-        status,
-        transfer_payments (
-          id,
-          payee_type,
-          amount,
-          status
-        )
+        id, created_at, subtotal, shipping_total, total_amount, status,
+        transfer_payments ( id, payee_type, amount, status )
       `)
       .order("created_at", { ascending: false })
       .limit(10);
 
     if (error) throw error;
-
     if (!orders || orders.length === 0) {
       container.innerHTML = "<p>No hay pedidos registrados todavía.</p>";
       return;
     }
 
-    // Armamos una tablita simple y prolija para ver los pedidos
+    const badgeStatus = (st) => {
+      const colors = {
+        pending: '#f0ad4e',
+        paid: '#22a765',
+        rejected: '#d9534f',
+        delivered: '#15334a'
+      };
+      const label = {
+        pending: 'Pendiente de Pago',
+        paid: 'Pago Aprobado',
+        rejected: 'Rechazado',
+        delivered: 'Entregado'
+      };
+      return `<span style="background:${colors[st] || '#718198'}; color:white; padding:3px 8px; border-radius:12px; font-size:11px; font-weight:bold;">${label[st] || st}</span>`;
+    };
+
     let html = `
       <table style="width:100%; border-collapse: collapse; text-align: left;">
         <thead>
-          <tr style="background: #f2f2f2; border-bottom: 2px solid #ddd;">
-            <th style="padding: 8px;">ID / Fecha</th>
-            <th style="padding: 8px;">Total</th>
-            <th style="padding: 8px;">Estado</th>
-            <th style="padding: 8px;">Pagos / Transferencias</th>
+          <tr style="background: #eef3f5; border-bottom: 2px solid #ddd;">
+            <th style="padding: 10px;">ID / Fecha</th>
+            <th style="padding: 10px;">Total</th>
+            <th style="padding: 10px;">Estado</th>
+            <th style="padding: 10px;">Transferencias</th>
           </tr>
         </thead>
         <tbody>
     `;
 
     orders.forEach(ord => {
-      const fecha = new Date(ord.created_at).toLocaleString();
-      let pagosHtml = "<ul style='margin:0; padding-left:15px;'>";
+      const fecha = new Date(ord.created_at).toLocaleString('es-AR');
+      let pagosHtml = "<ul style='margin:0; padding-left:15px; font-size:12px;'>";
       if (ord.transfer_payments) {
         ord.transfer_payments.forEach(p => {
           pagosHtml += `<li><b>${p.payee_type === 'merchant' ? 'Comercio' : 'Merlo Ya'}:</b> $${p.amount} (${p.status})</li>`;
@@ -1228,10 +1256,10 @@ async function cargarDashboardAdmin() {
 
       html += `
         <tr style="border-bottom: 1px solid #eee;">
-          <td style="padding: 8px;"><small>${ord.id.slice(0,8)}...</small><br>${fecha}</td>
-          <td style="padding: 8px;"><b>$${ord.total_amount}</b></td>
-          <td style="padding: 8px;"><span style="background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-size: 12px;">${ord.status}</span></td>
-          <td style="padding: 8px;">${pagosHtml}</td>
+          <td style="padding: 10px;"><small>#${ord.id.slice(0,8)}</small><br><span style="font-size:11px; color:#666;">${fecha}</span></td>
+          <td style="padding: 10px;"><b>$${ord.total_amount}</b></td>
+          <td style="padding: 10px;">${badgeStatus(ord.status)}</td>
+          <td style="padding: 10px;">${pagosHtml}</td>
         </tr>
       `;
     });

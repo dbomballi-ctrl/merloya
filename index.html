@@ -1180,21 +1180,20 @@ async function cargarDashboardAdmin() {
   }
 }
 // Notificación automática por WhatsApp vía CallMeBot
-    function enviarWhatsAppPedido(pedidoId, nombreComercio, clienteTel, direccion, totalMonto, telefonoDestino) {
-      const apiKey = '6276391';
-      const mensaje = `🚨 *NUEVO PEDIDO EN MERLO YA* %0A` +
-                      `🆔 Pedido #${pedidoId} %0A` +
-                      `🏪 Comercio: ${nombreComercio} %0A` +
-                      `👤 Teléfono Cliente: ${clienteTel || 'No informado'} %0A` +
-                      `📍 Dirección: ${direccion} %0A` +
-                      `💰 Total: $${totalMonto}`;
+  function enviarWhatsAppPedido(pedidoId, nombreComercio, clienteTel, direccion, totalMonto, telefonoDestino) {
+    const apiKey = '6276391';
+    const mensaje = `🚨 *NUEVO PEDIDO EN MERLO YA* %0A` +
+                    `🆔 Pedido #${pedidoId} %0A` +
+                    `🏪 Comercio: ${nombreComercio} %0A` +
+                    `👤 Teléfono Cliente: ${clienteTel || 'No informado'} %0A` +
+                    `📍 Dirección: ${direccion} %0A` +
+                    `💰 Total: $${totalMonto}`;
 
-      const url = `https://api.callmebot.com/whatsapp.php?phone=${telefonoDestino}&text=${encodeURIComponent(mensaje)}&apikey=${apiKey}`;
-      
-      fetch(url)
-        .then(response => console.log('Notificación WhatsApp enviada:', response.status))
-        .catch(err => console.error('Error al enviar WhatsApp:', err));
-    }
+const url = `https://api.callmebot.com/whatsapp.php?phone=${telefonoDestino}&text=${encodeURIComponent(mensaje)}&apikey=${apiKey}`;
+    // Dispara la llamada en segundo plano sin interferir con la UI
+    const img = new Image();
+    img.src = url;
+  }
 
 </script>
 

@@ -191,6 +191,12 @@
       <h3>📊 Dashboard Admin (Diego y Seba)</h3>
       <p><b>Total Facturado en la App:</b> <span id="admin-total-ventas">$0</span></p>
       <p><b>Comisiones históricas:</b> <span id="admin-total-comision">$0</span></p>
+      <div style="margin-top: 20px; border-top: 1px solid #ccc; padding-top: 15px;">
+  <h4>Pedidos y Transferencias Recientes</h4>
+  <div id="admin-orders-list" style="overflow-x: auto; font-size: 14px;">
+    Cargando pedidos...
+  </div>
+</div>
       <button onclick="cargarDashboardAdmin()" style="background:var(--green-sierras); color:white; border:none; padding:8px 12px; border-radius:4px; cursor:pointer;">🔄 Actualizar Datos</button>
     </div>
 
@@ -1094,6 +1100,84 @@
   window.cargarDatosComercioTransferencias=cargarDatosComercioTransferencias;
   window.addEventListener('load',refreshCart);
 })();
+</script>
+
+<script>
+async function cargarDashboardAdmin() {
+  const container = document.getElementById("admin-orders-list");
+  if (!container) return;
+  container.innerHTML = "Cargando pedidos recientes...";
+
+  try {
+    // Consultamos los últimos pedidos con sus pagos asociados usando el cliente de Supabase global
+    const { data: orders, error } = await window.supabaseClient
+      .from("orders")
+      .select(`
+        id,
+        created_at,
+        subtotal,
+        shipping_total,
+        total_amount,
+        status,
+        transfer_payments (
+          id,
+          payee_type,
+          amount,
+          status
+        )
+      `)
+      .order("created_at", { ascending: false })
+      .limit(10);
+
+    if (error) throw error;
+
+    if (!orders || orders.length === 0) {
+      container.innerHTML = "<p>No hay pedidos registrados todavía.</p>";
+      return;
+    }
+
+    // Armamos una tablita simple y prolija para ver los pedidos
+    let html = `
+      <table style="width:100%; border-collapse: collapse; text-align: left;">
+        <thead>
+          <tr style="background: #f2f2f2; border-bottom: 2px solid #ddd;">
+            <th style="padding: 8px;">ID / Fecha</th>
+            <th style="padding: 8px;">Total</th>
+            <th style="padding: 8px;">Estado</th>
+            <th style="padding: 8px;">Pagos / Transferencias</th>
+          </tr>
+        </thead>
+        <tbody>
+    `;
+
+    orders.forEach(ord => {
+      const fecha = new Date(ord.created_at).toLocaleString();
+      let pagosHtml = "<ul style='margin:0; padding-left:15px;'>";
+      if (ord.transfer_payments) {
+        ord.transfer_payments.forEach(p => {
+          pagosHtml += `<li><b>${p.payee_type === 'merchant' ? 'Comercio' : 'Merlo Ya'}:</b> $${p.amount} (${p.status})</li>`;
+        });
+      }
+      pagosHtml += "</ul>";
+
+      html += `
+        <tr style="border-bottom: 1px solid #eee;">
+          <td style="padding: 8px;"><small>${ord.id.slice(0,8)}...</small><br>${fecha}</td>
+          <td style="padding: 8px;"><b>$${ord.total_amount}</b></td>
+          <td style="padding: 8px;"><span style="background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-size: 12px;">${ord.status}</span></td>
+          <td style="padding: 8px;">${pagosHtml}</td>
+        </tr>
+      `;
+    });
+
+    html += "</tbody></table>";
+    container.innerHTML = html;
+
+  } catch (err) {
+    console.error("Error al cargar pedidos del admin:", err);
+    container.innerHTML = "<p style='color: red;'>Error al cargar los pedidos recientes.</p>";
+  }
+}
 </script>
 
 </body>

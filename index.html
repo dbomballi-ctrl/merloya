@@ -1044,7 +1044,7 @@
     btn.disabled=true;btn.textContent='Creando pedido…';
     try{
       const {data,error}=await _supabase.functions.invoke('create-transfer-order',{body:{delivery_address:address,delivery_zone:zone,delivery_latitude:lat,delivery_longitude:lon,customer_phone:phone,items}});
-      if(error)throw new Error(error.message||'No se pudo crear el pedido
+if(error) throw new Error(error.message || 'No se pudo crear el pedido');
       // Disparar notificación automática por WhatsApp (CallMeBot)
       try {
         const nombreComercioPrincipal = currentLines()[0]?.merchant?.nombre || 'Comercio Asociado';

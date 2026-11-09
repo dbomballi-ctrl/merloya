@@ -1110,7 +1110,7 @@ async function cargarDashboardAdmin() {
 
   try {
     // Consultamos los últimos pedidos con sus pagos asociados usando el cliente de Supabase global
-    const { data: orders, error } = await window.supabaseClient
+    const { data: orders, error } = await supabase
       .from("orders")
       .select(`
         id,

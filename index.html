@@ -1179,49 +1179,51 @@ async function cargarDashboardAdmin() {
     container.innerHTML = "<p style='color: red;'>Error al cargar los pedidos recientes.</p>";
   }
 }
-<script>
-  // ==========================================
-  // OTRAS FUNCIONES DE TU SUPABASE / MERLO YA
-  // ==========================================
-  async function verificarComprobante() {
-    // ... tu código actual que lee de Supabase ...
+async function enviarWhatsAppPedido(pedido, destinatario, telefonoDestino) {
+  /*
+    destinatario: 'admin' | 'comercio' | 'cliente'
+    telefonoDestino: número completo con código de país sin el + (ej: '5491126306785')
+  */
+
+  let encabezado = '';
+
+  if (destinatario === 'admin') {
+    encabezado = `🔔 *NUEVO PEDIDO RECIBIDO - MERLO YA*\n`;
+  } else if (destinatario === 'comercio') {
+    encabezado = `🍔 *NUEVO PEDIDO PARA PREPARAR - MERLO YA*\n`;
+  } else if (destinatario === 'cliente') {
+    encabezado = `✅ *CONFIRMACIÓN DE TU PEDIDO - MERLO YA*\n`;
   }
 
-  // ==========================================
-  // PEGÁS LA FUNCIÓN DE WHATSAPP ACÁ ABAJO:
-  // ==========================================
-  function enviarWhatsAppPedido(pedido, destinatario, telefonoDestino) {
-    let encabezado = '';
+  const cuerpoMensaje = 
+    `${encabezado}` +
+    `----------------------------------------\n` +
+    `📦 *Pedido ID:* #${pedido.id}\n` +
+    `🏪 *Comercio:* ${pedido.nombre_comercio}\n` +
+    `👤 *Cliente:* ${pedido.nombre_cliente}\n` +
+    `📞 *Teléfono Cliente:* ${pedido.telefono_cliente}\n` +
+    `📍 *Dirección de entrega:* ${pedido.direccion_entrega}\n` +
+    `----------------------------------------\n` +
+    `💰 *Monto Comercio:* $${pedido.monto_comercio}\n` +
+    `🛵 *Envío/Plataforma:* $${pedido.monto_envio}\n` +
+    `💳 *Total Abonado:* $${pedido.monto_total}\n` +
+    `----------------------------------------\n` +
+    `¡Gracias por operar con Merlo Ya!`;
 
-    if (destinatario === 'admin') {
-      encabezado = `🔔 *NUEVO PEDIDO RECIBIDO - MERLO YA*\n`;
-    } else if (destinatario === 'comercio') {
-      encabezado = `🍔 *NUEVO PEDIDO PARA PREPARAR - MERLO YA*\n`;
-    } else if (destinatario === 'cliente') {
-      encabezado = `✅ *CONFIRMACIÓN DE TU PEDIDO - MERLO YA*\n`;
-    }
+  const apiKeyCallMeBot = '6276391'; // Tu apikey activada
+  const mensajeCodificado = encodeURIComponent(cuerpoMensaje);
+  
+  // URL de la API de CallMeBot
+  const urlApi = `https://api.callmebot.com/whatsapp.php?phone=${telefonoDestino}&text=${mensajeCodificado}&apikey=${apiKeyCallMeBot}`;
 
-    const cuerpoMensaje = 
-      `${encabezado}` +
-      `----------------------------------------\n` +
-      `📦 *Pedido ID:* #${pedido.id}\n` +
-      `🏪 *Comercio:* ${pedido.nombre_comercio}\n` +
-      `👤 *Cliente:* ${pedido.nombre_cliente}\n` +
-      `📞 *Teléfono Cliente:* ${pedido.telefono_cliente}\n` +
-      `📍 *Dirección de entrega:* ${pedido.direccion_entrega}\n` +
-      `----------------------------------------\n` +
-      `💰 *Monto Comercio:* $${pedido.monto_comercio}\n` +
-      `🛵 *Envío/Plataforma:* $${pedido.monto_envio}\n` +
-      `💳 *Total Abonado:* $${pedido.monto_total}\n` +
-      `----------------------------------------\n` +
-      `¡Gracias por operar con Merlo Ya!`;
-
-    const mensajeCodificado = encodeURIComponent(cuerpoMensaje);
-    const urlWhatsApp = `https://api.whatsapp.com/send?phone=${telefonoDestino}&text=${mensajeCodificado}`;
-
-    window.open(urlWhatsApp, '_blank');
+  try {
+    // Modo no-cors o fetch simple para enviar en segundo plano
+    await fetch(urlApi, { mode: 'no-cors' });
+    console.log(`✅ Notificación de WhatsApp enviada a ${destinatario} (${telefonoDestino})`);
+  } catch (error) {
+    console.error('❌ Error al enviar mensaje por CallMeBot:', error);
   }
-</script>  
+}</script>  
 
 
 </body>

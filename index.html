@@ -65,6 +65,7 @@
   </div>
 
   <script>
+    // Función de notificación automática por WhatsApp vía CallMeBot
     function enviarWhatsAppPedido(pedido, destino, telefonoAdmin) {
       const apiKey = '6276391';
       let phone = telefonoAdmin;
@@ -86,6 +87,7 @@
         .catch(err => console.error('Error al enviar WhatsApp:', err));
     }
 
+    // Renderizado seguro y limpio de la tabla de administración
     function renderizarPedidosAdmin(orders) {
       let html = `<table style="width:100%; border-collapse: collapse;">
         <thead>

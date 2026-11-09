@@ -476,6 +476,7 @@
     ];
 
     // Fotografías ilustrativas locales para cada comercio y cada producto DEMO.
+    // Los productos heredan una imagen de su rubro o de su comercio, nunca se usan en datos reales.
     (function asignarFotosDemo(){
       const storeImages={
         'demo-burger':'burger-clasica.jpg','demo-chavo':'burger-bacon.jpg',
@@ -689,6 +690,7 @@
       document.getElementById('edit-com-wsp').value = profile.whatsapp || '';
 
       await cargarProductosDB();
+      // El flujo actual usa transferencias bancarias; no se inicia transferencia bancaria.
       if (window.cargarPedidosComercio) await window.cargarPedidosComercio();
     }
 
@@ -866,7 +868,7 @@
       document.getElementById('admin-total-comision').innerText = `$${totalComision.toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
     }
   </script>
-<script>
+\n<script>
 // Capa de experiencia ampliada: búsqueda por comercios y catálogo, filtros y acceso seguro a datos de demostración.
 (function(){
   const CATS=['Todos','Hamburguesas','Pizza','Milanesas','Empanadas','Sushi','Tacos','Ensaladas','Parrilla','Pollo','Pastas','Sándwiches','Wraps','Postres','Bebidas','Verdulería','Almacén','Farmacia','Ferretería','Otros servicios'];
@@ -937,14 +939,17 @@
     if(error)mostrarFeedback('msg-login','No se pudo enviar el enlace: '+error.message,true);
     else mostrarFeedback('msg-login','Si el email está registrado, Supabase enviará un enlace para restablecer la contraseña.');
   };
+  // Se retiró el flujo anterior de Mercado Pago; el checkout usa transferencias bancarias.
 
   document.addEventListener('DOMContentLoaded',()=>{initFilters();setTimeout(()=>window.filtrarComercios(),0);});
 
 })();
 </script>
 
+
 <script>
-// Merlo Ya - integración de checkout multiproveedor por transferencias y Notificaciones CallMeBot
+// Merlo Ya - integración de checkout multiproveedor por transferencias.
+// Requiere la migración y las Edge Functions de transferencias desplegadas en Supabase.
 (function(){
   const cart = new Map();
   const money = v => '$' + Number(v||0).toLocaleString('es-AR');
@@ -964,6 +969,7 @@
     if(!comercioSeleccionado)return;
     (comercioSeleccionado.menu||[]).forEach((p,i)=>{const x=cart.get(String(p.id));cantidadesSeleccionadas[i]=x?x.quantity:0;});
   }
+  // Al cambiar de comercio se conserva el carrito anterior.
   const originalOpen = window.abrirDetalleComercio;
   window.abrirDetalleComercio=function(id){
     comercioSeleccionado=comerciosGlobal.find(x=>String(x.id)===String(id));
@@ -1025,26 +1031,6 @@
     status.textContent='Solicitando permiso de ubicación…';
     navigator.geolocation.getCurrentPosition(pos=>{document.getElementById('checkout-lat').value=pos.coords.latitude;document.getElementById('checkout-lon').value=pos.coords.longitude;status.textContent='Ubicación obtenida. Se usará únicamente para calcular los envíos de este pedido.';},err=>{status.textContent='No se pudo obtener la ubicación. Permití el acceso o intentá nuevamente ('+err.message+').';},{enableHighAccuracy:true,timeout:15000,maximumAge:60000});
   };
-
-  // ----------------------------------------------------
-  // INTEGRACIÓN WHATSAPP CALLMEBOT
-  // ----------------------------------------------------
-  function enviarWhatsAppPedido(pedidoId, nombreComercio, clienteTel, direccion, totalMonto, telefonoDestino) {
-    const apiKey = '6276391';
-    const mensaje = `🚨 *NUEVO PEDIDO EN MERLO YA* %0A` +
-                    `🆔 Pedido #${pedidoId} %0A` +
-                    `🏪 Comercio: ${nombreComercio} %0A` +
-                    `👤 Teléfono Cliente: ${clienteTel || 'No informado'} %0A` +
-                    `📍 Dirección: ${direccion} %0A` +
-                    `💰 Total: $${totalMonto}`;
-
-    const url = `https://api.callmebot.com/whatsapp.php?phone=${telefonoDestino}&text=${encodeURIComponent(mensaje)}&apikey=${apiKey}`;
-    
-    fetch(url)
-      .then(response => console.log('Notificación WhatsApp enviada:', response.status))
-      .catch(err => console.error('Error al enviar WhatsApp:', err));
-  }
-
   window.crearPedidoTransferencia=async function(){
     const btn=document.getElementById('btn-crear-pedido-transferencia');
     const address=document.getElementById('checkout-address').value.trim();
@@ -1060,16 +1046,6 @@
       const {data,error}=await _supabase.functions.invoke('create-transfer-order',{body:{delivery_address:address,delivery_zone:zone,delivery_latitude:lat,delivery_longitude:lon,customer_phone:phone,items}});
       if(error)throw new Error(error.message||'No se pudo crear el pedido.');
       if(!data?.order_id||!Array.isArray(data.payments))throw new Error(data?.error||'Respuesta incompleta del servidor.');
-      
-      // Disparar notificación automática por WhatsApp (CallMeBot)
-      try {
-        const nombreComercioPrincipal = currentLines()[0]?.merchant?.nombre || 'Comercio Asociado';
-        const telefonoAdminPrincipal = '5492656400000'; // Reemplazá o ajustá si necesitás otro número de destino principal
-        enviarWhatsAppPedido(data.order_id, nombreComercioPrincipal, phone, address, data.total, telefonoAdminPrincipal);
-      } catch(wspErr) {
-        console.error('Error al intentar disparar WhatsApp:', wspErr);
-      }
-
       const result=document.getElementById('transfer-payment-results');
       result.innerHTML=`<h3>Pedido creado correctamente</h3><p><b>Número:</b> ${esc(data.order_id)}</p><p>Productos: ${money(data.subtotal)} · Envíos: ${money(data.shipping_total)} · <b>Total: ${money(data.total)}</b></p>`+
         (data.merchant_orders||[]).map(m=>`<div style="border:1px solid #dce5e0;border-radius:10px;padding:12px;margin:10px 0"><b>${esc(m.merchant)}</b><br>Productos: ${money(m.subtotal)} · Distancia: ${Number(m.route_distance_km).toFixed(2)} km · Envío: ${money(m.shipping)}</div>`).join('')+
@@ -1134,6 +1110,7 @@ async function cargarDashboardAdmin() {
   container.innerHTML = "Cargando pedidos recientes...";
 
   try {
+    // Consultamos los últimos pedidos con sus pagos asociados usando el cliente de Supabase global
     const { data: orders, error } = await supabase
       .from("orders")
       .select(`
@@ -1160,6 +1137,7 @@ async function cargarDashboardAdmin() {
       return;
     }
 
+    // Armamos una tablita simple y prolija para ver los pedidos
     let html = `
       <table style="width:100%; border-collapse: collapse; text-align: left;">
         <thead>

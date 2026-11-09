@@ -759,7 +759,7 @@
       }
     }
 
-    function renderABMProductos() {
+function renderABMProductos() {
       const contenedor = document.getElementById('lista-abm-productos');
       contenedor.innerHTML = '';
 
@@ -769,15 +769,25 @@
       }
 
       productosComercioLogueado.forEach((p) => {
+        const disponible = p.disponible !== false;
         contenedor.innerHTML += `
-          <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid #eee;">
-            <span><b>${p.nombre}</b> - $${p.precio}</span>
-            <button onclick="eliminarProductoDB('${p.id}')" style="background:#d9534f; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;">Eliminar</button>
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #eee;">
+            <div>
+              <b>${p.nombre}</b> - $${p.precio}
+              <span style="font-size:12px; margin-left:8px; color:${disponible ? '#22a765' : '#d9534f'};">
+                ${disponible ? '● Disponible' : '● Agotado'}
+              </span>
+            </div>
+            <div style="display:flex; gap:6px;">
+              <button onclick="cambiarEstadoProductoDB('${p.id}', ${!disponible})" style="background:${disponible ? '#f0ad4e' : '#22a765'}; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;">
+                ${disponible ? 'Pausar' : 'Activar'}
+              </button>
+              <button onclick="eliminarProductoDB('${p.id}')" style="background:#d9534f; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;">Eliminar</button>
+            </div>
           </div>
         `;
       });
     }
-
     async function agregarProductoDB() {
       const nombre = document.getElementById('prod-nombre').value;
       const precio = parseFloat(document.getElementById('prod-precio').value);

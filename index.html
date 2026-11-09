@@ -1197,12 +1197,12 @@ async function cargarDashboardAdmin() {
                     `📍 Dirección: ${direccion} %0A` +
                     `💰 Total: $${totalMonto}`;
 
-const url = `https://api.callmebot.com/whatsapp.php?phone=${telefonoDestino}&text=${encodeURIComponent(mensaje)}&apikey=${apiKey}`;
+    const url = `https://api.callmebot.com/whatsapp.php?phone=${+5491126306785}&text=${encodeURIComponent(mensaje)}&apikey=${apiKey}`;
+    
     // Dispara la llamada en segundo plano sin interferir con la UI
     const img = new Image();
     img.src = url;
   }
-
 </script>
 
 </body>

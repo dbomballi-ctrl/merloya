@@ -1,0 +1,27 @@
+name: Supabase Edge Functions
+
+on:
+  pull_request:
+    branches: [main, merlo-ya-2.0-dev]
+    paths:
+      - "supabase/functions/**"
+      - ".github/workflows/supabase-functions.yml"
+  push:
+    branches: [main, merlo-ya-2.0-dev]
+    paths:
+      - "supabase/functions/**"
+      - ".github/workflows/supabase-functions.yml"
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Type-check Edge Functions
+        run: |
+          deno check supabase/functions/create-transfer-order/index.ts
+          deno check supabase/functions/submit-transfer-proof/index.ts
+          deno check supabase/functions/review-transfer-payment/index.ts

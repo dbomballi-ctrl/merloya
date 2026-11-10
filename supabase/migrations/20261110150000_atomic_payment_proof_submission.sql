@@ -30,6 +30,13 @@ begin
   if not found then
     raise exception 'PAYMENT_NOT_OWNED' using errcode = '42501';
   end if;
+  if v_status = 'proof_submitted' and exists (
+    select 1 from public.payment_proofs pp
+    where pp.payment_id = p_payment_id and pp.storage_path = p_storage_path
+      and pp.uploaded_by = p_actor_id
+  ) then
+    return jsonb_build_object('status', 'proof_submitted', 'order_id', v_order_id, 'replayed', true);
+  end if;
   if v_status not in ('awaiting_transfer', 'rejected') then
     raise exception 'PAYMENT_NOT_ACCEPTING_PROOF' using errcode = '22023';
   end if;

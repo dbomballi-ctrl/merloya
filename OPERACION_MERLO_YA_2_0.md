@@ -54,7 +54,7 @@ Antes de una prueba end-to-end deben configurarse en staging:
 
 - Cuenta bancaria/CBU/alias de Merlo Ya en `platform_settings` (desde el panel de administración).
 - Cuenta de transferencia y coordenadas de cada comercio en `merchant_payment_accounts` y `profiles`.
-- Tarifas reales de delivery en `delivery_rate_tiers`. Los valores iniciales de la migración son demostrativos y no deben usarse como tarifas comerciales sin aprobación.
+- Tarifas reales de delivery en `delivery_rate_tiers`. Los valores iniciales de la migración son demostrativos y no deben usarse como tarifas comerciales sin aprobación. Los tramos usan límites `[min_km, max_km)`, deben ser contiguos, empezar en 0 km y el último debe tener límite superior abierto.
 - Dominio de Vercel como `APP_ORIGIN`.
 - Políticas de autenticación, confirmación de email y URL de redirección de Supabase.
 - Un cliente, un comercio y un usuario administrador de prueba.
@@ -74,6 +74,9 @@ Antes de una prueba end-to-end deben configurarse en staging:
 - Comercio no puede revisar la transferencia de delivery ni la de otro comercio.
 - Administración puede revisar ambas clases de transferencia.
 - Pedido queda confirmado únicamente cuando todas las transferencias están verificadas.
+- Administración puede asignar un pedido confirmado a un perfil repartidor.
+- El repartidor solo ve sus entregas y puede pasar de asignado a retirado y de retirado a entregado.
+- El cliente puede consultar el estado de entrega desde el historial de pedidos.
 - Archivos de comprobantes no son accesibles sin autorización; los enlaces firmados expiran.
 
 ## Límites actuales

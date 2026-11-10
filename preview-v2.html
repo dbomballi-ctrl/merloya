@@ -67,15 +67,20 @@ render();updateCart();
           desc:m.zona || 'Comercio local',img:'',products:items,live:true,id:m.id};
       });
       if (live.length) {
-        stores.splice(0, stores.length, ...live);
+        // Mantener los comercios de muestra mientras el catálogo real se completa.
+        // Si un comercio real tiene el mismo nombre, prevalece su ficha de Supabase.
+        const liveNames = new Set(live.map(s => s.name.trim().toLowerCase()));
+        const samples = demoStores.filter(s => !liveNames.has(s.name.trim().toLowerCase()));
+        stores.splice(0, stores.length, ...live, ...samples);
         window.catalogStatus = 'live';
       } else {
+        stores.splice(0, stores.length, ...demoStores);
         window.catalogStatus = 'empty';
       }
       render();
       const note = document.getElementById('catalog-note');
       if (note) note.textContent = live.length
-        ? 'Comercios y productos conectados al catálogo de Merlo Ya'
+        ? live.length + ' comercio(s) real(es) conectado(s). También se muestran comercios de ejemplo mientras se completa el catálogo.'
         : 'Todavía no hay comercios publicados. Esta vista conserva ejemplos.';
     } catch (e) {
       console.warn('No se pudo cargar el catálogo:', e.message);
@@ -84,7 +89,7 @@ render();updateCart();
       if (note) note.textContent = 'No se pudo conectar al catálogo; se muestran ejemplos.';
     }
   }
-  window.addEventListener('DOMContentLoaded', loadCatalog);
+  loadCatalog();
 })();
 </script>
 </body></html>

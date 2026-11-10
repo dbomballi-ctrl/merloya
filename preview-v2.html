@@ -18,7 +18,7 @@ header{background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0
 <div class="section-head"><div><h2>Explorá por categoría</h2><p>Encontrá eso que necesitás</p></div></div>
 <div class="chips" id="chips"></div>
 <div class="section-head"><div><h2>Comercios para descubrir</h2><p>Elegí un local y mirá lo que tiene para ofrecerte</p></div><span class="muted" id="count"></span></div>
-<div class="grid" id="stores"></div>
+<div class="grid" id="stores"></div><p class="muted" id="catalog-note">Conectando catálogo…</p>
 <section class="delivery"><div class="delivery-icon">🛵</div><div><strong>Tu pedido llega con Merlo Ya</strong><p>El delivery lo coordinamos nosotros. También podés elegir retirar directamente en el comercio.</p></div></section>
 <div class="footer">Merlo Ya · Comprá cerca, apoyá lo local.</div>
 </main>
@@ -42,4 +42,49 @@ function updateCart(){document.getElementById('cartCount').textContent=cart.redu
 function changeQty(i,d){cart[i].qty+=d;if(cart[i].qty<=0)cart.splice(i,1);updateCart()}
 function openCart(){updateCart();document.getElementById('overlay').classList.add('open')}function closeCart(){document.getElementById('overlay').classList.remove('open')}
 render();updateCart();
-</script></body></html>
+</script>
+<!-- Conexión de catálogo público: solo lectura -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+(() => {
+  const SUPABASE_URL = 'https://pdkbdcimpzfemerfrcjj.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_EZkOnb4CVwm-UD77_fqvdw_YetVafm6';
+  const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  const demoStores = stores.slice();
+  window.catalogStatus = 'loading';
+  async function loadCatalog() {
+    try {
+      const [{data: merchants, error: merchantError},{data: products, error: productError}] = await Promise.all([
+        db.from('profiles').select('id,nombre,rubro,zona').eq('role','comercio'),
+        db.from('products').select('id,comercio_id,nombre,precio')
+      ]);
+      if (merchantError) throw merchantError;
+      if (productError) throw productError;
+      const live = (merchants || []).map(m => {
+        const items = (products || []).filter(p => p.comercio_id === m.id)
+          .map(p => [p.nombre, Number(p.precio) || 0, p.id]);
+        return {name:m.nombre || 'Comercio',cat:m.rubro || 'Comercios',
+          desc:m.zona || 'Comercio local',img:'',products:items,live:true,id:m.id};
+      });
+      if (live.length) {
+        stores.splice(0, stores.length, ...live);
+        window.catalogStatus = 'live';
+      } else {
+        window.catalogStatus = 'empty';
+      }
+      render();
+      const note = document.getElementById('catalog-note');
+      if (note) note.textContent = live.length
+        ? 'Comercios y productos conectados al catálogo de Merlo Ya'
+        : 'Todavía no hay comercios publicados. Esta vista conserva ejemplos.';
+    } catch (e) {
+      console.warn('No se pudo cargar el catálogo:', e.message);
+      window.catalogStatus = 'error';
+      const note = document.getElementById('catalog-note');
+      if (note) note.textContent = 'No se pudo conectar al catálogo; se muestran ejemplos.';
+    }
+  }
+  window.addEventListener('DOMContentLoaded', loadCatalog);
+})();
+</script>
+</body></html>

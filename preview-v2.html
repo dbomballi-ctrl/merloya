@@ -390,7 +390,7 @@ render();updateCart();
   async function loadCatalog() {
     try {
       const [{data: merchants, error: merchantError},{data: products, error: productError}] = await Promise.all([
-        db.from('profiles').select('id,nombre,rubro,zona').eq('role','comercio'),
+        db.from('public_merchants').select('id,nombre,rubro,zona'),
         db.from('products').select('id,comercio_id,nombre,precio')
       ]);
       if (merchantError) throw merchantError;

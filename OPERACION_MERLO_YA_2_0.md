@@ -24,6 +24,7 @@ Aplicar en orden, primero en un proyecto Supabase de staging:
 5. `20261110160000_atomic_payment_review.sql`
 6. `20261110170000_profile_signup_trigger.sql`
 7. `20261110180000_delivery_assignments.sql`
+8. `20261110190000_security_hardening.sql`
 
 Las migraciones deben ejecutarse una sola vez por entorno y verificarse contra el esquema real antes de producción. No ejecutar manualmente solo una migración posterior: las RPC dependen de las tablas creadas por la primera.
 
@@ -85,5 +86,7 @@ Antes de una prueba end-to-end deben configurarse en staging:
 - La asignación manual de repartidores y los estados asignado/retirado/entregado están implementados con actualización transaccional; no hay tracking GPS en tiempo real.
 - El retiro por parte del cliente en el comercio todavía no está implementado en el checkout.
 - Los perfiles con rol `repartidor` deben ser habilitados por administración; no existe alta pública de repartidores.
+- El rol `repartidor` está permitido por la restricción de perfiles, pero no puede ser elegido desde el registro público.
+- La migración de hardening elimina la lectura/inserción pública de perfiles, restringe las columnas expuestas, limita ventas heredadas y exige rol comercio para modificar productos.
 - No se ha ejecutado una prueba real contra staging, porque el repositorio no proporciona acceso administrativo ni secretos de Supabase/Vercel.
 - No se debe fusionar a `main` ni desplegar a producción hasta completar las pruebas anteriores y revisar las tarifas/destinos bancarios reales.

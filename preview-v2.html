@@ -184,16 +184,20 @@ async function uploadPaymentProof(paymentId,button){
     const {data:{user},error:userError}=await db.auth.getUser();
     if(userError||!user)throw userError||new Error('Iniciá sesión nuevamente.');
     const safeName=file.name.normalize('NFKD').replace(/[^a-zA-Z0-9._-]/g,'_').slice(-100)||'comprobante';
-    storagePath=user.id+'/'+paymentId+'/'+crypto.randomUUID()+'-'+safeName;
-    const {error:uploadError}=await db.storage.from('payment-proofs').upload(storagePath,file,{contentType:file.type,upsert:false});
-    if(uploadError)throw uploadError;
+    storagePath=button.dataset.storagePath||user.id+'/'+paymentId+'/'+crypto.randomUUID()+'-'+safeName;
+    if(!button.dataset.storagePath){
+      const {error:uploadError}=await db.storage.from('payment-proofs').upload(storagePath,file,{contentType:file.type,upsert:false});
+      if(uploadError)throw uploadError;
+      button.dataset.storagePath=storagePath;
+    }
     const {data,error:fnError}=await db.functions.invoke('submit-transfer-proof',{body:{payment_id:paymentId,storage_path:storagePath}});
     if(fnError)throw fnError;
     if(!data?.success)throw new Error(data?.error||'No se pudo registrar el comprobante.');
     note.textContent='Comprobante recibido. Pendiente de revisión.';
-    input.disabled=true;button.textContent='Comprobante enviado';
+    input.disabled=true;button.disabled=true;button.textContent='Comprobante enviado';delete button.dataset.storagePath;
   }catch(e){
-    if(storagePath)await db.storage.from('payment-proofs').remove([storagePath]);
+    // Keep the uploaded file and reuse its path on retry: the server may have committed
+    // the proof even if the response was lost in transit.
     note.textContent=e.message||'No se pudo subir el comprobante.';
     button.disabled=false;button.textContent='Reintentar';
   }

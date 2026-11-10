@@ -37,7 +37,8 @@ let active='Todos',cart=[];
 const money=n=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(n);
 function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function render(){
-  document.getElementById('chips').innerHTML=categories.map(c=>'<button class="chip '+(c===active?'active':'')+'" data-category="'+esc(c)+'">'+esc(c)+'</button>').join('');
+  const categoryList=['Todos',...new Set([...categories.slice(1),...stores.map(s=>s.cat).filter(Boolean)])];
+  document.getElementById('chips').innerHTML=categoryList.map(c=>'<button class="chip '+(c===active?'active':'')+'" data-category="'+esc(c)+'">'+esc(c)+'</button>').join('');
   document.querySelectorAll('[data-category]').forEach(btn=>btn.addEventListener('click',()=>{active=btn.dataset.category;render()}));
   const q=document.getElementById('search').value.trim().toLowerCase();
   const list=stores.filter(s=>(active==='Todos'||s.cat===active)&&(s.name+' '+s.desc+' '+s.products.map(p=>p[0]).join(' ')).toLowerCase().includes(q));

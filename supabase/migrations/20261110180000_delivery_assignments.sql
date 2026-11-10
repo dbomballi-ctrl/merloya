@@ -36,5 +36,6 @@ using (
 
 -- Writes are performed only by the role-checked Edge Function using service_role.
 revoke all on public.delivery_assignments from public, anon, authenticated;
+grant select on public.delivery_assignments to authenticated;
 
 commit;

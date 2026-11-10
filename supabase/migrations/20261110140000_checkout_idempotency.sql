@@ -124,6 +124,9 @@ begin
 end;
 $$;
 
+-- Disable the legacy non-idempotent overload so there is one supported checkout entry point.
+revoke all on function public.create_merlo_transfer_order(jsonb, jsonb, jsonb, jsonb)
+  from public, anon, authenticated, service_role;
 revoke all on function public.create_merlo_transfer_order(uuid, text, jsonb, jsonb, jsonb, jsonb)
   from public, anon, authenticated;
 grant execute on function public.create_merlo_transfer_order(uuid, text, jsonb, jsonb, jsonb, jsonb)

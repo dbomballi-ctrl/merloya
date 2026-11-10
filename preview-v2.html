@@ -79,6 +79,47 @@ function captureDeliveryLocation(){
   note.textContent='Solicitando permiso de ubicación…';
   navigator.geolocation.getCurrentPosition(pos=>{deliveryCoords={lat:pos.coords.latitude,lon:pos.coords.longitude};note.textContent='Ubicación obtenida correctamente.'},err=>{note.textContent=err.code===1?'Permiso de ubicación denegado.':'No se pudo obtener la ubicación. Revisá GPS y permisos.'},{enableHighAccuracy:true,timeout:15000,maximumAge:60000});
 }
+function renderOrderReceipt(data){
+  const payments=data.payments||[];
+  document.getElementById('cartLines').innerHTML='<h3>Pedido creado</h3><p class="notice">Número de pedido: '+esc(data.order_id)+'</p>'+
+    payments.map(p=>'<div class="cart-line" style="display:block"><b>'+(p.payee_type==='merchant'?'Transferencia al comercio':'Envío · Merlo Ya')+'</b>'+
+      '<div class="muted">'+money(Number(p.amount))+'</div>'+
+      '<div class="notice">'+esc(p.destination_snapshot?.bank_name||'')+' · '+esc(p.destination_snapshot?.account_holder||'')+'</div>'+
+      '<div class="notice">CBU: '+esc(p.destination_snapshot?.cbu||'—')+'<br>Alias: '+esc(p.destination_snapshot?.alias||'—')+'</div>'+
+      '<label class="muted" for="proof-'+esc(p.id)+'">Comprobante (JPG, PNG o PDF; máximo 5 MB)</label>'+
+      '<input id="proof-'+esc(p.id)+'" type="file" accept="image/jpeg,image/png,application/pdf" style="width:100%;margin:8px 0">'+
+      '<button class="pill" type="button" data-proof="'+esc(p.id)+'">Subir comprobante</button>'+
+      '<span class="notice" id="proof-status-'+esc(p.id)+'">'+(p.status==='proof_submitted'?'Comprobante recibido': 'Pendiente de transferencia')+'</span></div>').join('')+
+    '<p class="notice">Transferí cada importe por separado y adjuntá el comprobante correspondiente. El pedido queda sujeto a revisión.</p>';
+  document.querySelectorAll('[data-proof]').forEach(btn=>btn.addEventListener('click',()=>uploadPaymentProof(btn.dataset.proof,btn)));
+  document.getElementById('cartBottom').innerHTML='<button class="primary" type="button" onclick="closeCart()">Cerrar</button>';
+}
+async function uploadPaymentProof(paymentId,button){
+  const db=window.merloDb, input=document.getElementById('proof-'+paymentId), note=document.getElementById('proof-status-'+paymentId);
+  const file=input?.files?.[0];
+  if(!db||!file){if(note)note.textContent='Seleccioná un archivo antes de continuar.';return}
+  const allowed=['image/jpeg','image/png','application/pdf'];
+  if(!allowed.includes(file.type)||file.size>5*1024*1024){note.textContent='Formato no permitido o archivo mayor a 5 MB.';return}
+  button.disabled=true;button.textContent='Subiendo…';note.textContent='';
+  let storagePath=null;
+  try{
+    const {data:{user},error:userError}=await db.auth.getUser();
+    if(userError||!user)throw userError||new Error('Iniciá sesión nuevamente.');
+    const safeName=file.name.normalize('NFKD').replace(/[^a-zA-Z0-9._-]/g,'_').slice(-100)||'comprobante';
+    storagePath=user.id+'/'+paymentId+'/'+crypto.randomUUID()+'-'+safeName;
+    const {error:uploadError}=await db.storage.from('payment-proofs').upload(storagePath,file,{contentType:file.type,upsert:false});
+    if(uploadError)throw uploadError;
+    const {data,error:fnError}=await db.functions.invoke('submit-transfer-proof',{body:{payment_id:paymentId,storage_path:storagePath}});
+    if(fnError)throw fnError;
+    if(!data?.success)throw new Error(data?.error||'No se pudo registrar el comprobante.');
+    note.textContent='Comprobante recibido. Pendiente de revisión.';
+    input.disabled=true;button.textContent='Comprobante enviado';
+  }catch(e){
+    if(storagePath)await db.storage.from('payment-proofs').remove([storagePath]);
+    note.textContent=e.message||'No se pudo subir el comprobante.';
+    button.disabled=false;button.textContent='Reintentar';
+  }
+}
 async function submitCheckout(){
   if(checkoutBusy)return;
   const db=window.merloDb;
@@ -96,8 +137,7 @@ async function submitCheckout(){
     const {data,error:fnError}=await db.functions.invoke('create-transfer-order',{headers:{'Idempotency-Key':checkoutIdempotencyKey},body:{delivery_address:address,delivery_zone:zone,customer_phone:phone,delivery_latitude:deliveryCoords.lat,delivery_longitude:deliveryCoords.lon,items:cart.map(x=>({product_id:x.productId,quantity:x.qty}))}});
     if(fnError)throw fnError;
     if(!data||!data.order_id)throw new Error(data?.error||'El servidor no confirmó la creación del pedido.');
-    document.getElementById('cartLines').innerHTML='<h3>Pedido creado</h3><p class="notice">Número de pedido: '+esc(data.order_id)+'</p>'+(data.payments||[]).map(p=>'<div class="cart-line"><div><b>'+(p.payee_type==='merchant'?'Transferencia al comercio':'Envío · Merlo Ya')+'</b><div class="muted">'+money(Number(p.amount))+'</div><div class="notice">'+esc(p.destination_snapshot?.bank_name||'')+' · '+esc(p.destination_snapshot?.account_holder||'')+'</div><div class="notice">CBU: '+esc(p.destination_snapshot?.cbu||'—')+'<br>Alias: '+esc(p.destination_snapshot?.alias||'—')+'</div></div></div>').join('')+'<p class="notice">Transferí cada importe por separado. El pedido queda sujeto a revisión de comprobantes.</p>';
-    document.getElementById('cartBottom').innerHTML='<button class="primary" type="button" onclick="closeCart()">Cerrar</button>';
+    renderOrderReceipt(data);
     cart=[];checkoutIdempotencyKey=null;document.getElementById('cartCount').textContent='0';
   }catch(e){error.textContent=e.message||'No se pudo crear el pedido. Verificá los datos e intentá nuevamente.';button.disabled=false;button.textContent='Reintentar'}
   finally{checkoutBusy=false}

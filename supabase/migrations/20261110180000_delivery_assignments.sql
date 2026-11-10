@@ -64,4 +64,64 @@ using (
 revoke all on public.delivery_assignments from public, anon, authenticated;
 grant select on public.delivery_assignments to authenticated;
 
+-- Update courier delivery state and merchant suborders as one transaction.
+create or replace function public.update_merlo_delivery_status(
+  p_order_id uuid,
+  p_next_status text,
+  p_actor_id uuid
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $
+declare
+  v_assignment public.delivery_assignments%rowtype;
+  v_role text;
+begin
+  if p_order_id is null or p_actor_id is null
+     or p_next_status not in ('picked_up', 'delivered') then
+    raise exception 'Invalid delivery status payload';
+  end if;
+
+  select role into v_role from public.profiles where id = p_actor_id;
+  if v_role is distinct from 'repartidor' then
+    raise exception 'DELIVERY_UPDATE_FORBIDDEN' using errcode = '42501';
+  end if;
+
+  select * into v_assignment
+  from public.delivery_assignments
+  where order_id = p_order_id
+  for update;
+
+  if not found or v_assignment.courier_id <> p_actor_id then
+    raise exception 'DELIVERY_ASSIGNMENT_NOT_OWNED' using errcode = '42501';
+  end if;
+
+  if not (
+    (v_assignment.status = 'assigned' and p_next_status = 'picked_up')
+    or (v_assignment.status = 'picked_up' and p_next_status = 'delivered')
+  ) then
+    raise exception 'DELIVERY_STATUS_CONFLICT' using errcode = '22023';
+  end if;
+
+  update public.delivery_assignments
+  set status = p_next_status, updated_at = now(),
+      picked_up_at = case when p_next_status = 'picked_up' then now() else picked_up_at end,
+      delivered_at = case when p_next_status = 'delivered' then now() else delivered_at end
+  where id = v_assignment.id;
+
+  update public.merchant_orders
+  set status = case when p_next_status = 'picked_up' then 'dispatched' else 'delivered' end
+  where order_id = p_order_id;
+
+  return jsonb_build_object('order_id', p_order_id, 'status', p_next_status);
+end;
+$;
+
+revoke all on function public.update_merlo_delivery_status(uuid, text, uuid)
+  from public, anon, authenticated;
+grant execute on function public.update_merlo_delivery_status(uuid, text, uuid)
+  to service_role;
+
 commit;

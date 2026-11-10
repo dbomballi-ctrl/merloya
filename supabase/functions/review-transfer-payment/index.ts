@@ -24,25 +24,22 @@ Deno.serve(async (req) => {
     if (!payment_id || !["verified", "rejected"].includes(decision)) {
       return json({ error: "Datos de revisión inválidos." }, 400);
     }
-    const { data: profile } = await db.from("profiles").select("role").eq("id", user.id).single();
-    const { data: payment } = await db.from("transfer_payments")
-      .select("id,payee_type,merchant_id,status").eq("id", payment_id).single();
-    if (!payment) return json({ error: "Pago inexistente." }, 404);
-
-    const isAdmin = profile?.role === "admin";
-    const isMerchantReview = profile?.role === "comercio" &&
-      payment.payee_type === "merchant" && payment.merchant_id === user.id;
-    if (!isAdmin && !isMerchantReview) return json({ error: "No tenés permisos para verificar esta transferencia." }, 403);
-    if (!["proof_submitted", "rejected"].includes(payment.status)) {
-      return json({ error: "El pago no tiene un comprobante pendiente de revisión." }, 409);
+    const { data: result, error: reviewError } = await db.rpc("review_merlo_transfer_payment", {
+      p_payment_id: payment_id,
+      p_decision: decision,
+      p_note: String(note ?? "").slice(0, 500) || null,
+      p_actor_id: user.id,
+    });
+    if (reviewError) {
+      if (reviewError.message?.includes("PAYMENT_NOT_REVIEWABLE")) {
+        return json({ error: "El pago ya no está pendiente de revisión." }, 409);
+      }
+      if (reviewError.message?.includes("PAYMENT_REVIEW_FORBIDDEN")) {
+        return json({ error: "No tenés permisos para verificar esta transferencia." }, 403);
+      }
+      throw reviewError;
     }
-
-    const { error } = await db.from("transfer_payments").update({
-      status: decision, reviewed_by: user.id, reviewed_at: new Date().toISOString(),
-      review_note: String(note ?? "").slice(0, 500) || null,
-    }).eq("id", payment_id);
-    if (error) throw error;
-    return json({ success: true, payment_id, status: decision });
+    return json({ success: true, payment_id, status: result?.status ?? decision });
   } catch (error) {
     console.error(error);
     return json({ error: error instanceof Error ? error.message : "No se pudo revisar el pago." }, 500);

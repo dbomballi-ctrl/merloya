@@ -22,6 +22,7 @@ Aplicar en orden, primero en un proyecto Supabase de staging:
 3. `20261110140000_checkout_idempotency.sql`
 4. `20261110150000_atomic_payment_proof_submission.sql`
 5. `20261110160000_atomic_payment_review.sql`
+6. `20261110170000_profile_signup_trigger.sql`
 
 Las migraciones deben ejecutarse una sola vez por entorno y verificarse contra el esquema real antes de producción. No ejecutar manualmente solo una migración posterior: las RPC dependen de las tablas creadas por la primera.
 
@@ -32,6 +33,7 @@ Desplegar estas funciones desde el proyecto Supabase correcto:
 - `create-transfer-order`
 - `submit-transfer-proof`
 - `review-transfer-payment`
+- `manage-platform-settings` (solo administración)
 
 Variables requeridas en el entorno de Edge Functions:
 
@@ -48,7 +50,7 @@ Variables opcionales:
 
 Antes de una prueba end-to-end deben configurarse en staging:
 
-- Cuenta bancaria/CBU/alias de Merlo Ya en `platform_settings`.
+- Cuenta bancaria/CBU/alias de Merlo Ya en `platform_settings` (desde el panel de administración).
 - Cuenta de transferencia y coordenadas de cada comercio en `merchant_payment_accounts` y `profiles`.
 - Tarifas reales de delivery en `delivery_rate_tiers`. Los valores iniciales de la migración son demostrativos y no deben usarse como tarifas comerciales sin aprobación.
 - Dominio de Vercel como `APP_ORIGIN`.

@@ -63,10 +63,13 @@ Deno.serve(async (req) => {
       }
       normalized.sort((a: any, b: any) => a.min_km - b.min_km);
       normalized.forEach((rate: any, index: number) => rate.sort_order = index + 1);
+      if (normalized[0].min_km !== 0 || normalized[normalized.length - 1].max_km !== null) {
+        return json({ error: "El primer tramo debe comenzar en 0 km y el último no debe tener límite superior." }, 400);
+      }
       for (let i = 1; i < normalized.length; i++) {
         const previous = normalized[i - 1];
-        if (previous.max_km === null || normalized[i].min_km <= previous.max_km) {
-          return json({ error: "Los tramos de distancia no pueden superponerse." }, 400);
+        if (previous.max_km === null || normalized[i].min_km !== previous.max_km) {
+          return json({ error: "Los tramos deben ser contiguos: el siguiente comienza donde termina el anterior." }, 400);
         }
       }
       const { data: existing, error: existingError } = await db.from("delivery_rate_tiers").select("id");

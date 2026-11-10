@@ -110,10 +110,14 @@ async function renderAccount(user){
     if(error)throw error;
     if(!orders?.length){document.getElementById('cartLines').innerHTML='<h3>Mis pedidos</h3><p class="notice">Todavía no tenés pedidos.</p>';return}
     const ids=orders.map(o=>o.id);
-    const {data:payments,error:paymentError}=await db.from('transfer_payments').select('id,order_id,payee_type,amount,destination_snapshot,status').in('order_id',ids).order('created_at',{ascending:true});
-    if(paymentError)throw paymentError;
+    const [{data:payments,error:paymentError},{data:assignments,error:assignmentError}]=await Promise.all([
+      db.from('transfer_payments').select('id,order_id,payee_type,amount,destination_snapshot,status').in('order_id',ids).order('created_at',{ascending:true}),
+      db.from('delivery_assignments').select('order_id,status').in('order_id',ids)
+    ]);
+    if(paymentError)throw paymentError;if(assignmentError)throw assignmentError;
+    const assignmentMap=new Map((assignments||[]).map(a=>[a.order_id,a.status]));
     const statusLabel={awaiting_transfers:'Esperando transferencias',payment_review:'Pago observado',confirmed:'Pago confirmado',cancelled:'Cancelado',proof_submitted:'Comprobante enviado',verified:'Transferencia verificada',rejected:'Comprobante rechazado'};
-    document.getElementById('cartLines').innerHTML='<h3>Mis pedidos</h3>'+orders.map(o=>'<section style="border:1px solid var(--line);border-radius:12px;padding:12px;margin:12px 0"><b>Pedido '+esc(o.id.slice(0,8))+'</b><p class="muted">'+new Date(o.created_at).toLocaleString('es-AR')+' · '+esc(statusLabel[o.status]||o.status)+'</p><p class="muted">'+esc(o.delivery_address)+'</p><div class="total"><span>Total</span><span>'+money(Number(o.total_amount))+'</span></div>'+
+    document.getElementById('cartLines').innerHTML='<h3>Mis pedidos</h3>'+orders.map(o=>'<section style="border:1px solid var(--line);border-radius:12px;padding:12px;margin:12px 0"><b>Pedido '+esc(o.id.slice(0,8))+'</b><p class="muted">'+new Date(o.created_at).toLocaleString('es-AR')+' · '+esc(statusLabel[o.status]||o.status)+'</p><p class="muted">'+esc(o.delivery_address)+'</p>'+(assignmentMap.has(o.id)?'<p class="notice">Delivery: '+esc({assigned:'Repartidor asignado',picked_up:'Pedido retirado',delivered:'Pedido entregado'}[assignmentMap.get(o.id)]||assignmentMap.get(o.id))+'</p>':'')+'<div class="total"><span>Total</span><span>'+money(Number(o.total_amount))+'</span></div>'+
       (payments||[]).filter(x=>x.order_id===o.id).map(x=>'<div class="cart-line" style="display:block"><b>'+(x.payee_type==='merchant'?'Comercio':'Envío · Merlo Ya')+' · '+money(Number(x.amount))+'</b><p class="muted">'+esc(statusLabel[x.status]||x.status)+'</p><p class="muted">'+esc(x.destination_snapshot?.bank_name||'')+' · '+esc(x.destination_snapshot?.account_holder||'')+'<br>CBU: '+esc(x.destination_snapshot?.cbu||'—')+'<br>Alias: '+esc(x.destination_snapshot?.alias||'—')+'</p>'+
       (['awaiting_transfer','rejected'].includes(x.status)?'<label class="muted" for="proof-'+esc(x.id)+'">Adjuntar comprobante (JPG, PNG o PDF; máximo 5 MB)</label><input id="proof-'+esc(x.id)+'" type="file" accept="image/jpeg,image/png,application/pdf" style="width:100%;margin:7px 0"><button class="pill" data-proof="'+esc(x.id)+'" type="button">Subir comprobante</button><span id="proof-status-'+esc(x.id)+'" class="notice"></span>':'')+'</div>').join('')+'</section>').join('');
     document.querySelectorAll('[data-proof]').forEach(btn=>btn.addEventListener('click',()=>uploadPaymentProof(btn.dataset.proof,btn)));
@@ -151,7 +155,11 @@ async function renderAccount(user){
     if(profile.role==='comercio')query=query.eq('merchant_id',user.id).eq('payee_type','merchant');
     const {data:payments,error}=await query;
     if(error)throw error;
-    if(!payments?.length){document.getElementById('cartLines').innerHTML=merchantSettings+'<h3>Transferencias para revisar</h3><p class="notice">No hay comprobantes pendientes de revisión.</p>';return}
+    if(!payments?.length){
+      document.getElementById('cartLines').innerHTML=merchantSettings+'<h3>Transferencias para revisar</h3><p class="notice">No hay comprobantes pendientes de revisión.</p>';
+      if(profile.role==='admin')await renderAdminDeliveryAssignments();
+      return
+    }
     const ids=payments.map(x=>x.id);
     const {data:proofs,error:proofError}=await db.from('payment_proofs').select('payment_id,storage_path,uploaded_at').in('payment_id',ids).order('uploaded_at',{ascending:false});
     if(proofError)throw proofError;
@@ -167,9 +175,69 @@ async function renderAccount(user){
         '<div style="display:flex;gap:8px"><button class="primary" style="width:50%" data-review="verified" data-payment="'+esc(x.id)+'">Verificar</button><button class="pill" style="width:50%" data-review="rejected" data-payment="'+esc(x.id)+'">Rechazar</button></div></section>';
     }).join('');
     document.querySelectorAll('[data-review]').forEach(btn=>btn.addEventListener('click',()=>reviewPayment(btn.dataset.payment,btn.dataset.review,btn)));
+    if(profile.role==='admin')await renderAdminDeliveryAssignments();
+  }else if(profile.role==='repartidor'){
+    await renderCourierAssignments(user);
   }else{
     document.getElementById('cartLines').innerHTML='<p class="notice">Este perfil no tiene acceso a un panel operativo.</p>';
   }
+}
+async function renderAdminDeliveryAssignments(){
+  const db=window.merloDb;
+  const {data:orders,error:orderError}=await db.from('orders').select('id,created_at,total_amount').eq('status','confirmed').order('created_at',{ascending:false}).limit(30);
+  if(orderError)throw orderError;
+  const container=document.getElementById('cartLines');
+  if(!orders?.length){container.innerHTML+='<section style="border:1px solid var(--line);border-radius:12px;padding:12px;margin:12px 0"><h3>Asignación de repartidores</h3><p class="notice">No hay pedidos con pagos confirmados para asignar.</p></section>';return}
+  const ids=orders.map(o=>o.id);
+  const [{data:assignments,error:assignmentError},{data:couriers,error:courierError}]=await Promise.all([
+    db.from('delivery_assignments').select('order_id,courier_id,status').in('order_id',ids),
+    db.from('profiles').select('id,nombre').eq('role','repartidor')
+  ]);
+  if(assignmentError)throw assignmentError;if(courierError)throw courierError;
+  const assigned=new Map((assignments||[]).map(x=>[x.order_id,x]));
+  const courierOptions=(couriers||[]).map(c=>'<option value="'+esc(c.id)+'">'+esc(c.nombre||'Repartidor')+'</option>').join('');
+  container.innerHTML+='<section style="border:1px solid var(--line);border-radius:12px;padding:12px;margin:12px 0"><h3>Asignación de repartidores</h3>'+
+    ((couriers||[]).length?orders.map(o=>{
+      const a=assigned.get(o.id),finished=a?.status==='delivered';
+      return '<div style="border-bottom:1px solid var(--line);padding:10px 0"><b>Pedido '+esc(o.id.slice(0,8))+' · '+money(Number(o.total_amount))+'</b><p class="muted">'+new Date(o.created_at).toLocaleString('es-AR')+' · '+esc(a?.status||'Sin asignar')+'</p>'+
+        '<select id="courier-'+esc(o.id)+'" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:9px;margin:5px 0" '+(finished?'disabled':'')+'><option value="">Seleccionar repartidor</option>'+courierOptions+'</select>'+
+        '<button class="pill" data-assign-order="'+esc(o.id)+'" type="button" '+(finished?'disabled':'')+'>'+(a?'Reasignar':'Asignar')+'</button></div>';
+    }).join(''):'<p class="notice">No hay perfiles con rol repartidor. Administración debe habilitar el rol en un perfil antes de asignar pedidos.</p>')+'</section>';
+  container.querySelectorAll('[data-assign-order]').forEach(btn=>{
+    const a=assigned.get(btn.dataset.assignOrder);if(a)document.getElementById('courier-'+btn.dataset.assignOrder).value=a.courier_id;
+    btn.addEventListener('click',()=>assignCourier(btn.dataset.assignOrder,btn));
+  });
+}
+async function assignCourier(orderId,button){
+  const courierId=document.getElementById('courier-'+orderId)?.value;
+  if(!courierId){alert('Seleccioná un repartidor.');return}
+  button.disabled=true;button.textContent='Asignando…';
+  const {data,error}=await window.merloDb.functions.invoke('manage-delivery-assignment',{body:{action:'assign',order_id:orderId,courier_id:courierId}});
+  if(error||!data?.success){alert(data?.error||error?.message||'No se pudo asignar.');button.disabled=false;button.textContent='Reintentar';return}
+  const {data:{user}}=await window.merloDb.auth.getUser();await renderAccount(user);
+}
+async function renderCourierAssignments(user){
+  const db=window.merloDb;
+  const {data:assignments,error}=await db.from('delivery_assignments').select('id,order_id,status,assigned_at').eq('courier_id',user.id).order('assigned_at',{ascending:false}).limit(50);
+  if(error)throw error;
+  if(!assignments?.length){document.getElementById('cartLines').innerHTML='<h3>Mis entregas</h3><p class="notice">No tenés entregas asignadas.</p>';return}
+  const {data:orders,error:orderError}=await db.from('orders').select('id,delivery_address,delivery_zone,customer_phone,total_amount').in('id',assignments.map(a=>a.order_id));
+  if(orderError)throw orderError;
+  const orderMap=new Map((orders||[]).map(o=>[o.id,o]));
+  const labels={assigned:'Asignado',picked_up:'Retirado del comercio',delivered:'Entregado',cancelled:'Cancelado'};
+  document.getElementById('cartLines').innerHTML='<h3>Mis entregas</h3>'+assignments.map(a=>{
+    const o=orderMap.get(a.order_id);
+    return '<section style="border:1px solid var(--line);border-radius:12px;padding:12px;margin:12px 0"><b>Pedido '+esc(a.order_id.slice(0,8))+'</b><p class="muted">'+esc(labels[a.status]||a.status)+'</p>'+
+      '<p>'+esc(o?.delivery_address||'')+' · '+esc(o?.delivery_zone||'')+'</p><p class="muted">Teléfono: '+esc(o?.customer_phone||'No informado')+'</p>'+
+      (a.status==='assigned'?'<button class="primary" data-delivery-status="picked_up" data-order="'+esc(a.order_id)+'">Marcar retirado del comercio</button>':a.status==='picked_up'?'<button class="primary" data-delivery-status="delivered" data-order="'+esc(a.order_id)+'">Marcar entregado</button>':'')+'</section>';
+  }).join('');
+  document.querySelectorAll('[data-delivery-status]').forEach(btn=>btn.addEventListener('click',()=>updateDeliveryStatus(btn.dataset.order,btn.dataset.deliveryStatus,btn)));
+}
+async function updateDeliveryStatus(orderId,status,button){
+  button.disabled=true;button.textContent='Actualizando…';
+  const {data,error}=await window.merloDb.functions.invoke('manage-delivery-assignment',{body:{action:'update_status',order_id:orderId,status}});
+  if(error||!data?.success){alert(data?.error||error?.message||'No se pudo actualizar la entrega.');button.disabled=false;button.textContent='Reintentar';return}
+  const {data:{user}}=await window.merloDb.auth.getUser();await renderAccount(user);
 }
 function addDeliveryRateRow(){
   const container=document.getElementById('deliveryRates');if(!container)return;

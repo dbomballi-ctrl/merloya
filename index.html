@@ -1138,39 +1138,92 @@ async function cambiarEstadoProductoDB(id, nuevoEstado) {
     status.textContent='Solicitando permiso de ubicación…';
     navigator.geolocation.getCurrentPosition(pos=>{document.getElementById('checkout-lat').value=pos.coords.latitude;document.getElementById('checkout-lon').value=pos.coords.longitude;status.textContent='Ubicación obtenida. Se usará únicamente para calcular los envíos de este pedido.';},err=>{status.textContent='No se pudo obtener la ubicación. Permití el acceso o intentá nuevamente ('+err.message+').';},{enableHighAccuracy:true,timeout:15000,maximumAge:60000});
   };
-  window.crearPedidoTransferencia=async function(){
-    const btn=document.getElementById('btn-crear-pedido-transferencia');
-    const address=document.getElementById('checkout-address').value.trim();
-    const zone=document.getElementById('checkout-zone').value;
-    const phone=document.getElementById('checkout-phone').value.trim();
-    const lat=Number(document.getElementById('checkout-lat').value),lon=Number(document.getElementById('checkout-lon').value);
-    if(!address){mostrarFeedback('msg-checkout','Ingresá la dirección de entrega.',true);return;}
-    if(!document.getElementById('checkout-lat').value||!document.getElementById('checkout-lon').value||!Number.isFinite(lat)||!Number.isFinite(lon)){mostrarFeedback('msg-checkout','Primero tocá “Usar mi ubicación” y autorizá el permiso para calcular el recorrido.',true);return;}
-    const {data:{session}}=await _supabase.auth.getSession();if(!session){mostrarFeedback('msg-checkout','Tu sesión venció. Iniciá sesión nuevamente.',true);return;}
-    const items=currentLines().map(x=>({product_id:x.product.id,quantity:x.quantity}));
-    btn.disabled=true;btn.textContent='Creando pedido…';
-    try{
-      const {data,error}=await _supabase.functions.invoke('create-transfer-order',{body:{delivery_address:address,delivery_zone:zone,delivery_latitude:lat,delivery_longitude:lon,customer_phone:phone,items}});
-if(error) throw new Error(error.message || 'No se pudo crear el pedido');
-      // Disparar notificación automática por WhatsApp (CallMeBot)
-      try {
-        const nombreComercioPrincipal = currentLines()[0]?.merchant?.nombre || 'Comercio Asociado';
-        const telefonoAdminPrincipal = '5492656400000'; // Reemplazá con tu número de WhatsApp
-        enviarWhatsAppPedido(data.order_id, nombreComercioPrincipal, phone, address, data.total, telefonoAdminPrincipal);
-      } catch(wspErr) {
-        console.error('Error al intentar disparar WhatsApp:', wspErr);
+window.crearPedidoTransferencia=async function(){
+  const btn=document.getElementById('btn-crear-pedido-transferencia');
+  const address=document.getElementById('checkout-address').value.trim();
+  const zone=document.getElementById('checkout-zone').value;
+  const phone=document.getElementById('checkout-phone').value.trim();
+  const lat=Number(document.getElementById('checkout-lat').value);
+  const lon=Number(document.getElementById('checkout-lon').value);
+
+  if(!address){mostrarFeedback('msg-checkout','Ingresá la dirección de entrega.',true);return;}
+  if(!document.getElementById('checkout-lat').value||!document.getElementById('checkout-lon').value||!Number.isFinite(lat)||!Number.isFinite(lon)){
+    mostrarFeedback('msg-checkout','Primero tocá “Usar mi ubicación” y autorizá el permiso para calcular el recorrido.',true);
+    return;
+  }
+
+  const {data:{session}}=await _supabase.auth.getSession();
+  if(!session){mostrarFeedback('msg-checkout','Tu sesión venció. Iniciá sesión nuevamente.',true);return;}
+
+  const items=currentLines().map(x=>({product_id:x.product.id,quantity:x.quantity}));
+  btn.disabled=true;
+  btn.textContent='Creando pedido…';
+
+  try{
+    const {data,error}=await _supabase.functions.invoke('create-transfer-order',{
+      body:{
+        delivery_address:address,
+        delivery_zone:zone,
+        delivery_latitude:lat,
+        delivery_longitude:lon,
+        customer_phone:phone,
+        items
       }
-      if(!data?.order_id||!Array.isArray(data.payments))throw new Error(data?.error||'Respuesta incompleta del servidor.');
-      const result=document.getElementById('transfer-payment-results');
-      result.innerHTML=`<h3>Pedido creado correctamente</h3><p><b>Número:</b> ${esc(data.order_id)}</p><p>Productos: ${money(data.subtotal)} · Envíos: ${money(data.shipping_total)} · <b>Total: ${money(data.total)}</b></p>`+
-        (data.merchant_orders||[]).map(m=>`<div style="border:1px solid #dce5e0;border-radius:10px;padding:12px;margin:10px 0"><b>${esc(m.merchant)}</b><br>Productos: ${money(m.subtotal)} · Distancia: ${Number(m.route_distance_km).toFixed(2)} km · Envío: ${money(m.shipping)}</div>`).join('')+
-        data.payments.map(p=>{const d=p.destination_snapshot||{};return `<div style="border:2px solid #dce5e0;border-radius:12px;padding:12px;margin:12px 0"><h4 style="margin:0 0 8px">Transferencia ${p.payee_type==='merchant'?'al comercio':'a Merlo Ya'}</h4><p><b>Importe:</b> ${money(p.amount)}</p><p><b>Titular:</b> ${esc(d.account_holder||'No informado')}</p><p><b>Banco:</b> ${esc(d.bank_name||'No informado')}</p><p><b>Alias:</b> <b>${esc(d.alias||'No informado')}</b></p><p><b>CBU:</b> ${esc(d.cbu||'No informado')}</p><label>Adjuntar comprobante (JPG, PNG o PDF; máximo 5 MB)<input type="file" accept="image/jpeg,image/png,application/pdf" id="proof-${esc(p.id)}" style="display:block;margin:8px 0"></label><button type="button" class="btn-submit" onclick="subirComprobanteTransferencia('${esc(p.id)}')">Enviar comprobante</button><small id="proof-status-${esc(p.id)}" style="display:block;margin-top:6px"></small></div>`;}).join('')+
-        '<p style="font-size:13px">El pedido queda pendiente hasta que cada transferencia sea revisada. No vuelvas a generar el pedido si ya se creó.</p>';
-      result.style.display='block';document.getElementById('checkout-fields').style.display='none';btn.style.display='none';cart.clear();refreshCart();
-    }catch(e){console.error(e);mostrarFeedback('msg-checkout',e.message||'No se pudo crear el pedido.',true);btn.disabled=false;btn.textContent='Generar pedido y ver transferencias';}
-    finally{btn.disabled=false;if(btn.style.display!=='none')btn.textContent='Generar pedido y ver transferencias';}
-  };
-  window.subirComprobanteTransferencia=async function(paymentId){
+    });
+
+    if(error) throw new Error(error.message||'No se pudo crear el pedido');
+    if(!data?.order_id||!Array.isArray(data.payments)){
+      throw new Error(data?.error||'Respuesta incompleta del servidor.');
+    }
+
+    const result=document.getElementById('transfer-payment-results');
+
+    result.innerHTML=
+      `<h3>Pedido creado correctamente</h3>
+      <p><b>Número:</b> ${esc(data.order_id)}</p>
+      <p>Productos: ${money(data.subtotal)} · Envíos: ${money(data.shipping_total)} · <b>Total: ${money(data.total)}</b></p>`+
+      (data.merchant_orders||[]).map(m=>
+        `<div style="border:1px solid #dce5e0;border-radius:10px;padding:12px;margin:10px 0">
+          <b>${esc(m.merchant)}</b><br>
+          Productos: ${money(m.subtotal)} · Distancia: ${Number(m.route_distance_km).toFixed(2)} km · Envío: ${money(m.shipping)}
+        </div>`
+      ).join('')+
+      data.payments.map(p=>{
+        const d=p.destination_snapshot||{};
+        return `<div style="border:2px solid #dce5e0;border-radius:12px;padding:12px;margin:12px 0">
+          <h4 style="margin:0 0 8px">Transferencia ${p.payee_type==='merchant'?'al comercio':'a Merlo Ya'}</h4>
+          <p><b>Importe:</b> ${money(p.amount)}</p>
+          <p><b>Titular:</b> ${esc(d.account_holder||'No informado')}</p>
+          <p><b>Banco:</b> ${esc(d.bank_name||'No informado')}</p>
+          <p><b>Alias:</b> <b>${esc(d.alias||'No informado')}</b></p>
+          <p><b>CBU:</b> ${esc(d.cbu||'No informado')}</p>
+          <label>Adjuntar comprobante (JPG, PNG o PDF; máximo 5 MB)
+            <input type="file" accept="image/jpeg,image/png,application/pdf" id="proof-${esc(p.id)}" style="display:block;margin:8px 0">
+          </label>
+          <button type="button" class="btn-submit" onclick="subirComprobanteTransferencia('${esc(p.id)}')">Enviar comprobante</button>
+          <small id="proof-status-${esc(p.id)}" style="display:block;margin-top:6px"></small>
+        </div>`;
+      }).join('')+
+      '<p style="font-size:13px">El pedido queda pendiente hasta que cada transferencia sea revisada. No vuelvas a generar el pedido si ya se creó.</p>';
+
+    result.style.display='block';
+    document.getElementById('checkout-fields').style.display='none';
+    btn.style.display='none';
+    cart.clear();
+    refreshCart();
+
+  }catch(e){
+    console.error(e);
+    mostrarFeedback('msg-checkout',e.message||'No se pudo crear el pedido.',true);
+    btn.disabled=false;
+    btn.textContent='Generar pedido y ver transferencias';
+  }finally{
+    btn.disabled=false;
+    if(btn.style.display!=='none'){
+      btn.textContent='Generar pedido y ver transferencias';
+    }
+  }
+};
     const input=document.getElementById('proof-'+paymentId);const status=document.getElementById('proof-status-'+paymentId);const file=input?.files?.[0];
     if(!file){status.textContent='Seleccioná un archivo primero.';return;}
     if(file.size>5*1024*1024||!['image/jpeg','image/png','application/pdf'].includes(file.type)){status.textContent='Archivo inválido. Usá JPG, PNG o PDF de hasta 5 MB.';return;}
@@ -1285,21 +1338,7 @@ async function cargarDashboardAdmin() {
   }
 }
 // Notificación automática por WhatsApp vía CallMeBot
-  function enviarWhatsAppPedido(pedidoId, nombreComercio, clienteTel, direccion, totalMonto, telefonoDestino) {
-    const apiKey = '6276391';
-    const mensaje = `🚨 *NUEVO PEDIDO EN MERLO YA* %0A` +
-                    `🆔 Pedido #${pedidoId} %0A` +
-                    `🏪 Comercio: ${nombreComercio} %0A` +
-                    `👤 Teléfono Cliente: ${clienteTel || 'No informado'} %0A` +
-                    `📍 Dirección: ${direccion} %0A` +
-                    `💰 Total: $${totalMonto}`;
 
-    const url = `https://api.callmebot.com/whatsapp.php?phone=${+5491126306785}&text=${encodeURIComponent(mensaje)}&apikey=${apiKey}`;
-    
-    // Dispara la llamada en segundo plano sin interferir con la UI
-    const img = new Image();
-    img.src = url;
-  }
 </script>
 
 </body>

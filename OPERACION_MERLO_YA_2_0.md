@@ -79,7 +79,7 @@ Antes de una prueba end-to-end deben configurarse en staging:
 ## Límites actuales
 
 - No se procesa dinero automáticamente: el pago es por transferencia y revisión humana.
-- La asignación manual de repartidores y los estados asignado/retirado/entregado están implementados; no hay tracking GPS en tiempo real.
+- La asignación manual de repartidores y los estados asignado/retirado/entregado están implementados con actualización transaccional; no hay tracking GPS en tiempo real.
 - El retiro por parte del cliente en el comercio todavía no está implementado en el checkout.
 - Los perfiles con rol `repartidor` deben ser habilitados por administración; no existe alta pública de repartidores.
 - No se ha ejecutado una prueba real contra staging, porque el repositorio no proporciona acceso administrativo ni secretos de Supabase/Vercel.

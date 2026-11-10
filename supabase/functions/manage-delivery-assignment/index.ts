@@ -57,28 +57,19 @@ Deno.serve(async (req) => {
       const orderId = String(body.order_id ?? "");
       const nextStatus = String(body.status ?? "");
       if (!orderId || !["picked_up", "delivered"].includes(nextStatus)) return json({ error: "Estado de entrega inválido." }, 400);
-      const { data: assignment, error: assignmentError } = await db.from("delivery_assignments")
-        .select("id,order_id,courier_id,status").eq("order_id", orderId).single();
-      if (assignmentError || !assignment) return json({ error: "Asignación inexistente." }, 404);
-      if (assignment.courier_id !== user.id) return json({ error: "Este pedido no está asignado a tu cuenta." }, 403);
-      const validTransition = (assignment.status === "assigned" && nextStatus === "picked_up") ||
-        (assignment.status === "picked_up" && nextStatus === "delivered");
-      if (!validTransition) return json({ error: "La transición de estado no está permitida." }, 409);
-
-      const patch: Record<string, unknown> = {
-        status: nextStatus, updated_at: new Date().toISOString(),
-        ...(nextStatus === "picked_up" ? { picked_up_at: new Date().toISOString() } : { delivered_at: new Date().toISOString() }),
-      };
-      const { data: updated, error: updateError } = await db.from("delivery_assignments")
-        .update(patch).eq("id", assignment.id).eq("status", assignment.status)
-        .select("id,order_id,courier_id,status,picked_up_at,delivered_at").maybeSingle();
-      if (updateError) throw updateError;
-      if (!updated) return json({ error: "La asignación cambió mientras se procesaba. Actualizá el panel." }, 409);
-
-      const merchantStatus = nextStatus === "picked_up" ? "dispatched" : "delivered";
-      const { error: merchantUpdateError } = await db.from("merchant_orders")
-        .update({ status: merchantStatus }).eq("order_id", orderId);
-      if (merchantUpdateError) throw merchantUpdateError;
+      const { data: updated, error: updateError } = await db.rpc("update_merlo_delivery_status", {
+        p_order_id: orderId, p_next_status: nextStatus, p_actor_id: user.id,
+      });
+      if (updateError) {
+        if (updateError.message?.includes("DELIVERY_STATUS_CONFLICT")) {
+          return json({ error: "La entrega cambió de estado o la transición no está permitida." }, 409);
+        }
+        if (updateError.message?.includes("DELIVERY_UPDATE_FORBIDDEN") ||
+            updateError.message?.includes("DELIVERY_ASSIGNMENT_NOT_OWNED")) {
+          return json({ error: "No tenés permiso para actualizar esta entrega." }, 403);
+        }
+        throw updateError;
+      }
       return json({ success: true, assignment: updated });
     }
 

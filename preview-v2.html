@@ -118,11 +118,26 @@ async function renderAccount(user){
       (['awaiting_transfer','rejected'].includes(x.status)?'<label class="muted" for="proof-'+esc(x.id)+'">Adjuntar comprobante (JPG, PNG o PDF; máximo 5 MB)</label><input id="proof-'+esc(x.id)+'" type="file" accept="image/jpeg,image/png,application/pdf" style="width:100%;margin:7px 0"><button class="pill" data-proof="'+esc(x.id)+'" type="button">Subir comprobante</button><span id="proof-status-'+esc(x.id)+'" class="notice"></span>':'')+'</div>').join('')+'</section>').join('');
     document.querySelectorAll('[data-proof]').forEach(btn=>btn.addEventListener('click',()=>uploadPaymentProof(btn.dataset.proof,btn)));
   }else if(profile.role==='comercio'||profile.role==='admin'){
+    let merchantSettings='';
+    if(profile.role==='comercio'){
+      const [{data:account},{data:location}]=await Promise.all([
+        db.from('merchant_payment_accounts').select('account_holder,bank_name,cbu,alias').eq('merchant_id',user.id).maybeSingle(),
+        db.from('profiles').select('latitude,longitude').eq('id',user.id).single()
+      ]);
+      merchantSettings='<section style="border:1px solid var(--line);border-radius:12px;padding:12px;margin:12px 0"><h3>Cuenta y ubicación del comercio</h3>'+
+        '<label class="muted">Titular de la cuenta</label><input id="merchantHolder" maxlength="120" value="'+esc(account?.account_holder||'')+'" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:9px;margin:5px 0 10px">'+
+        '<label class="muted">Banco o billetera</label><input id="merchantBank" maxlength="120" value="'+esc(account?.bank_name||'')+'" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:9px;margin:5px 0 10px">'+
+        '<label class="muted">Alias</label><input id="merchantAlias" maxlength="80" value="'+esc(account?.alias||'')+'" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:9px;margin:5px 0 10px">'+
+        '<label class="muted">CBU</label><input id="merchantCbu" maxlength="30" value="'+esc(account?.cbu||'')+'" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:9px;margin:5px 0 10px">'+
+        '<label class="muted">Latitud</label><input id="merchantLat" type="number" step="any" value="'+esc(location?.latitude??'')+'" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:9px;margin:5px 0 10px">'+
+        '<label class="muted">Longitud</label><input id="merchantLon" type="number" step="any" value="'+esc(location?.longitude??'')+'" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:9px;margin:5px 0 10px">'+
+        '<button class="pill" type="button" onclick="captureMerchantLocation()">Usar ubicación actual</button><button class="primary" style="margin-top:8px" type="button" onclick="saveMerchantSettings()">Guardar datos</button><p id="merchantSettingsNote" class="notice">El alias o CBU y la ubicación son necesarios para recibir pedidos.</p></section>';
+    }
     let query=db.from('transfer_payments').select('id,order_id,merchant_id,payee_type,amount,status,created_at').eq('status','proof_submitted').order('created_at',{ascending:false}).limit(50);
     if(profile.role==='comercio')query=query.eq('merchant_id',user.id).eq('payee_type','merchant');
     const {data:payments,error}=await query;
     if(error)throw error;
-    if(!payments?.length){document.getElementById('cartLines').innerHTML='<h3>Transferencias para revisar</h3><p class="notice">No hay comprobantes pendientes de revisión.</p>';return}
+    if(!payments?.length){document.getElementById('cartLines').innerHTML=merchantSettings+'<h3>Transferencias para revisar</h3><p class="notice">No hay comprobantes pendientes de revisión.</p>';return}
     const ids=payments.map(x=>x.id);
     const {data:proofs,error:proofError}=await db.from('payment_proofs').select('payment_id,storage_path,uploaded_at').in('payment_id',ids).order('uploaded_at',{ascending:false});
     if(proofError)throw proofError;
@@ -130,7 +145,7 @@ async function renderAccount(user){
       const {data}=await db.storage.from('payment-proofs').createSignedUrl(proof.storage_path,300);
       return {payment_id:proof.payment_id,url:data?.signedUrl};
     }));
-    document.getElementById('cartLines').innerHTML='<h3>Transferencias para revisar</h3>'+payments.map(x=>{
+    document.getElementById('cartLines').innerHTML=merchantSettings+'<h3>Transferencias para revisar</h3>'+payments.map(x=>{
       const proof=proofLinks.find(y=>y.payment_id===x.id);
       return '<section style="border:1px solid var(--line);border-radius:12px;padding:12px;margin:12px 0"><b>Pedido '+esc(x.order_id.slice(0,8))+'</b><p class="muted">'+(x.payee_type==='merchant'?'Pago al comercio':'Pago de envío')+' · '+money(Number(x.amount))+'</p>'+
         (proof?.url?'<a href="'+esc(proof.url)+'" target="_blank" rel="noopener">Ver comprobante privado</a>':'<p class="notice">No se encontró el archivo del comprobante.</p>')+
@@ -141,6 +156,31 @@ async function renderAccount(user){
   }else{
     document.getElementById('cartLines').innerHTML='<p class="notice">Este perfil no tiene acceso a un panel operativo.</p>';
   }
+}
+function captureMerchantLocation(){
+  const note=document.getElementById('merchantSettingsNote');
+  if(!navigator.geolocation){note.textContent='Este navegador no permite obtener ubicación.';return}
+  note.textContent='Solicitando permiso de ubicación…';
+  navigator.geolocation.getCurrentPosition(pos=>{
+    document.getElementById('merchantLat').value=pos.coords.latitude;
+    document.getElementById('merchantLon').value=pos.coords.longitude;
+    note.textContent='Ubicación obtenida. Guardá los cambios.';
+  },err=>{note.textContent='No se pudo obtener ubicación: '+err.message},{enableHighAccuracy:true,timeout:15000});
+}
+async function saveMerchantSettings(){
+  const db=window.merloDb,holder=document.getElementById('merchantHolder')?.value.trim();
+  const bank=document.getElementById('merchantBank')?.value.trim(),alias=document.getElementById('merchantAlias')?.value.trim(),cbu=document.getElementById('merchantCbu')?.value.trim();
+  const latRaw=document.getElementById('merchantLat')?.value,lonRaw=document.getElementById('merchantLon')?.value;
+  const lat=Number(latRaw),lon=Number(lonRaw),note=document.getElementById('merchantSettingsNote');
+  if(!holder||(!alias&&!cbu)){note.textContent='Completá titular y al menos alias o CBU.';return}
+  if(!latRaw||!lonRaw||!Number.isFinite(lat)||!Number.isFinite(lon)||lat < -90||lat>90||lon < -180||lon>180){note.textContent='Ingresá coordenadas válidas o usá la ubicación actual.';return}
+  const {data:{user}}=await db.auth.getUser();
+  if(!user){note.textContent='La sesión expiró. Volvé a ingresar.';return}
+  const {error:bankError}=await db.from('merchant_payment_accounts').upsert({merchant_id:user.id,account_holder:holder,bank_name:bank||null,alias:alias||null,cbu:cbu||null},{onConflict:'merchant_id'});
+  if(bankError){note.textContent='No se pudo guardar la cuenta: '+bankError.message;return}
+  const {error:locationError}=await db.from('profiles').update({latitude:lat,longitude:lon}).eq('id',user.id);
+  if(locationError){note.textContent='Cuenta guardada, pero no se pudo guardar la ubicación: '+locationError.message;return}
+  note.textContent='Cuenta y ubicación guardadas correctamente.';
 }
 async function reviewPayment(paymentId,decision,button){
   button.disabled=true;button.textContent='Guardando…';

@@ -40,7 +40,9 @@ Deno.serve(async (req) => {
       if (courierError || courier?.role !== "repartidor") return json({ error: "La cuenta seleccionada no es un repartidor habilitado." }, 400);
 
       const { data: existing } = await db.from("delivery_assignments").select("id,status").eq("order_id", orderId).maybeSingle();
-      if (existing?.status === "delivered") return json({ error: "El pedido ya fue entregado y no puede reasignarse." }, 409);
+      if (existing && ["picked_up", "delivered"].includes(existing.status)) {
+        return json({ error: "El pedido ya fue retirado o entregado y no puede reasignarse." }, 409);
+      }
       const { data: assignment, error } = await db.from("delivery_assignments").upsert({
         order_id: orderId, courier_id: courierId, assigned_by: user.id,
         status: "assigned", assigned_at: new Date().toISOString(),

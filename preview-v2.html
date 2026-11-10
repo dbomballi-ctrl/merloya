@@ -66,7 +66,7 @@ function updateCart(){
   const total=cart.reduce((a,x)=>a+x.price*x.qty,0);
   document.getElementById('cartBottom').innerHTML='<div class="total"><span>Subtotal</span><span>'+money(total)+'</span></div><button class="primary" type="button" onclick="showCheckout()">Continuar al checkout</button><p class="notice">Los productos de muestra no se pueden comprar. Se requiere una cuenta de cliente y ubicación de entrega.</p><p class="notice">Vista previa: no se realizan compras ni pagos reales.</p>';
 }
-let checkoutBusy=false,deliveryCoords=null;
+let checkoutBusy=false,deliveryCoords=null,checkoutIdempotencyKey=null;
 function showCheckout(){
   if(!cart.length)return;
   if(cart.some(x=>!x.productId)){alert('El carrito contiene productos de muestra. Elegí productos publicados por comercios reales para continuar.');return}
@@ -92,12 +92,13 @@ async function submitCheckout(){
   try{
     const {data:authData,error:authError}=await db.auth.signInWithPassword({email,password});
     if(authError||!authData.user)throw authError||new Error('No se pudo iniciar sesión.');
-    const {data,error:fnError}=await db.functions.invoke('create-transfer-order',{body:{delivery_address:address,delivery_zone:zone,customer_phone:phone,delivery_latitude:deliveryCoords.lat,delivery_longitude:deliveryCoords.lon,items:cart.map(x=>({product_id:x.productId,quantity:x.qty}))}});
+    checkoutIdempotencyKey=checkoutIdempotencyKey||crypto.randomUUID();
+    const {data,error:fnError}=await db.functions.invoke('create-transfer-order',{headers:{'Idempotency-Key':checkoutIdempotencyKey},body:{delivery_address:address,delivery_zone:zone,customer_phone:phone,delivery_latitude:deliveryCoords.lat,delivery_longitude:deliveryCoords.lon,items:cart.map(x=>({product_id:x.productId,quantity:x.qty}))}});
     if(fnError)throw fnError;
     if(!data||!data.order_id)throw new Error(data?.error||'El servidor no confirmó la creación del pedido.');
     document.getElementById('cartLines').innerHTML='<h3>Pedido creado</h3><p class="notice">Número de pedido: '+esc(data.order_id)+'</p>'+(data.payments||[]).map(p=>'<div class="cart-line"><div><b>'+(p.payee_type==='merchant'?'Transferencia al comercio':'Envío · Merlo Ya')+'</b><div class="muted">'+money(Number(p.amount))+'</div><div class="notice">'+esc(p.destination_snapshot?.bank_name||'')+' · '+esc(p.destination_snapshot?.account_holder||'')+'</div><div class="notice">CBU: '+esc(p.destination_snapshot?.cbu||'—')+'<br>Alias: '+esc(p.destination_snapshot?.alias||'—')+'</div></div></div>').join('')+'<p class="notice">Transferí cada importe por separado. El pedido queda sujeto a revisión de comprobantes.</p>';
     document.getElementById('cartBottom').innerHTML='<button class="primary" type="button" onclick="closeCart()">Cerrar</button>';
-    cart=[];document.getElementById('cartCount').textContent='0';
+    cart=[];checkoutIdempotencyKey=null;document.getElementById('cartCount').textContent='0';
   }catch(e){error.textContent=e.message||'No se pudo crear el pedido. Verificá los datos e intentá nuevamente.';button.disabled=false;button.textContent='Reintentar'}
   finally{checkoutBusy=false}
 }

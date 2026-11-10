@@ -27,6 +27,7 @@ jobs:
           deno check supabase/functions/create-transfer-order/index.ts
           deno check supabase/functions/submit-transfer-proof/index.ts
           deno check supabase/functions/review-transfer-payment/index.ts
+          deno check supabase/functions/manage-platform-settings/index.ts
       - name: Check inline JavaScript and static HTML IDs
         run: |
           python3 - <<'PY'

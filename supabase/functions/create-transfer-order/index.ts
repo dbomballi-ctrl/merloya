@@ -112,7 +112,7 @@ Deno.serve(async (req) => {
       const route = await routeResponse.json();
       if (route.code !== "Ok" || !route.routes?.[0]) return json({ error: `No hay recorrido disponible desde ${merchant.nombre}.` }, 422);
       const km = Number(route.routes[0].distance) / 1000;
-      const tier = rates.find(r => km >= Number(r.min_km) && (r.max_km === null || km <= Number(r.max_km)));
+      const tier = rates.find(r => km >= Number(r.min_km) && (r.max_km === null || km < Number(r.max_km)));
       if (!tier) return json({ error: `No hay tarifa configurada para ${km.toFixed(1)} km.` }, 409);
       const subtotal = lines.reduce((sum, x) => sum + Number(x.product.precio) * x.quantity, 0);
       subtotalTotal += subtotal; shippingTotal += Number(tier.fee);

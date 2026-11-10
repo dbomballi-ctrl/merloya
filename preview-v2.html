@@ -56,7 +56,7 @@ function showProducts(name){
 function add(name,i){
   const s=stores.find(x=>x.name===name),p=s?.products[i];if(!p)return;
   const key=name+'|'+p[0],item=cart.find(x=>x.key===key);
-  if(item)item.qty++;else cart.push({key,store:name,name:p[0],price:Number(p[1])||0,qty:1});
+  if(item)item.qty++;else cart.push({key,store:name,name:p[0],price:Number(p[1])||0,productId:p[2]||null,qty:1});
   updateCart();showProducts(name);
 }
 function updateCart(){
@@ -64,7 +64,42 @@ function updateCart(){
   if(!cart.length){document.getElementById('cartLines').innerHTML='<div class="empty">🛍️<h3>Tu carrito está vacío</h3><p>Sumá productos de tus comercios favoritos.</p></div>';document.getElementById('cartBottom').innerHTML='';return}
   document.getElementById('cartLines').innerHTML=cart.map((x,i)=>'<div class="cart-line"><div><b>'+esc(x.name)+'</b><div class="muted">'+esc(x.store)+' · '+money(x.price)+'</div></div><div class="qty"><button type="button" onclick="changeQty('+i+',-1)">−</button>'+x.qty+'<button type="button" onclick="changeQty('+i+',1)">+</button></div></div>').join('');
   const total=cart.reduce((a,x)=>a+x.price*x.qty,0);
-  document.getElementById('cartBottom').innerHTML='<div class="total"><span>Subtotal</span><span>'+money(total)+'</span></div><button class="primary" onclick="alert(\'El checkout real se habilitará en la siguiente etapa. Esta vista previa no procesa compras ni pagos.\')">Continuar</button><p class="notice">Vista previa: no se realizan compras ni pagos reales.</p>';
+  document.getElementById('cartBottom').innerHTML='<div class="total"><span>Subtotal</span><span>'+money(total)+'</span></div><button class="primary" type="button" onclick="showCheckout()">Continuar al checkout</button><p class="notice">Los productos de muestra no se pueden comprar. Se requiere una cuenta de cliente y ubicación de entrega.</p><p class="notice">Vista previa: no se realizan compras ni pagos reales.</p>';
+}
+let checkoutBusy=false,deliveryCoords=null;
+function showCheckout(){
+  if(!cart.length)return;
+  if(cart.some(x=>!x.productId)){alert('El carrito contiene productos de muestra. Elegí productos publicados por comercios reales para continuar.');return}
+  document.getElementById('cartLines').innerHTML='<h3>Datos para el pedido</h3><label class="muted">Email de tu cuenta</label><input id="coEmail" type="email" autocomplete="username" placeholder="tu@email.com" style="width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;margin:5px 0 12px"><label class="muted">Contraseña</label><input id="coPassword" type="password" autocomplete="current-password" placeholder="Contraseña" style="width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;margin:5px 0 12px"><label class="muted">Dirección de entrega</label><input id="coAddress" placeholder="Calle y número" style="width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;margin:5px 0 12px"><label class="muted">Barrio / zona (opcional)</label><input id="coZone" placeholder="Barrio" style="width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;margin:5px 0 12px"><label class="muted">Teléfono</label><input id="coPhone" type="tel" placeholder="Código de área y número" style="width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;margin:5px 0 12px"><button class="pill" type="button" onclick="captureDeliveryLocation()">Usar mi ubicación actual</button><p id="coLocation" class="notice">La ubicación se solicita solo cuando tocás el botón.</p><p id="coError" class="notice" role="status"></p>';
+  document.getElementById('cartBottom').innerHTML='<button id="coSubmit" class="primary" type="button" onclick="submitCheckout()">Crear pedido</button><button class="pill" style="width:100%;margin-top:8px" type="button" onclick="updateCart()">Volver al carrito</button><p class="notice">Se generan instrucciones de transferencia. No se debita dinero automáticamente.</p>';
+}
+function captureDeliveryLocation(){
+  const note=document.getElementById('coLocation');
+  if(!navigator.geolocation){note.textContent='Este navegador no permite obtener ubicación.';return}
+  note.textContent='Solicitando permiso de ubicación…';
+  navigator.geolocation.getCurrentPosition(pos=>{deliveryCoords={lat:pos.coords.latitude,lon:pos.coords.longitude};note.textContent='Ubicación obtenida correctamente.'},err=>{note.textContent=err.code===1?'Permiso de ubicación denegado.':'No se pudo obtener la ubicación. Revisá GPS y permisos.'},{enableHighAccuracy:true,timeout:15000,maximumAge:60000});
+}
+async function submitCheckout(){
+  if(checkoutBusy)return;
+  const db=window.merloDb;
+  const email=document.getElementById('coEmail')?.value.trim(),password=document.getElementById('coPassword')?.value;
+  const address=document.getElementById('coAddress')?.value.trim(),zone=document.getElementById('coZone')?.value.trim(),phone=document.getElementById('coPhone')?.value.trim();
+  const error=document.getElementById('coError'),button=document.getElementById('coSubmit');
+  if(!db){error.textContent='No se pudo inicializar la conexión con el servicio.';return}
+  if(!email||!password||!address||!deliveryCoords){error.textContent='Completá email, contraseña, dirección y ubicación.';return}
+  if(cart.some(x=>!x.productId)){error.textContent='Hay productos de muestra en el carrito. Quitalos antes de continuar.';return}
+  checkoutBusy=true;button.disabled=true;button.textContent='Creando pedido…';error.textContent='';
+  try{
+    const {data:authData,error:authError}=await db.auth.signInWithPassword({email,password});
+    if(authError||!authData.user)throw authError||new Error('No se pudo iniciar sesión.');
+    const {data,error:fnError}=await db.functions.invoke('create-transfer-order',{body:{delivery_address:address,delivery_zone:zone,customer_phone:phone,delivery_latitude:deliveryCoords.lat,delivery_longitude:deliveryCoords.lon,items:cart.map(x=>({product_id:x.productId,quantity:x.qty}))}});
+    if(fnError)throw fnError;
+    if(!data||!data.order_id)throw new Error(data?.error||'El servidor no confirmó la creación del pedido.');
+    document.getElementById('cartLines').innerHTML='<h3>Pedido creado</h3><p class="notice">Número de pedido: '+esc(data.order_id)+'</p>'+(data.payments||[]).map(p=>'<div class="cart-line"><div><b>'+(p.payee_type==='merchant'?'Transferencia al comercio':'Envío · Merlo Ya')+'</b><div class="muted">'+money(Number(p.amount))+'</div><div class="notice">'+esc(p.destination_snapshot?.bank_name||'')+' · '+esc(p.destination_snapshot?.account_holder||'')+'</div><div class="notice">CBU: '+esc(p.destination_snapshot?.cbu||'—')+'<br>Alias: '+esc(p.destination_snapshot?.alias||'—')+'</div></div></div>').join('')+'<p class="notice">Transferí cada importe por separado. El pedido queda sujeto a revisión de comprobantes.</p>';
+    document.getElementById('cartBottom').innerHTML='<button class="primary" type="button" onclick="closeCart()">Cerrar</button>';
+    cart=[];updateCart();
+  }catch(e){error.textContent=e.message||'No se pudo crear el pedido. Verificá los datos e intentá nuevamente.';button.disabled=false;button.textContent='Reintentar'}
+  finally{checkoutBusy=false}
 }
 function changeQty(i,d){if(!cart[i])return;cart[i].qty+=d;if(cart[i].qty<=0)cart.splice(i,1);updateCart()}
 function openCart(){updateCart();document.getElementById('overlay').classList.add('open')}function closeCart(){document.getElementById('overlay').classList.remove('open')}
@@ -77,6 +112,7 @@ render();updateCart();
   const SUPABASE_URL = 'https://pdkbdcimpzfemerfrcjj.supabase.co';
   const SUPABASE_KEY = 'sb_publishable_EZkOnb4CVwm-UD77_fqvdw_YetVafm6';
   const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  window.merloDb = db;
   const demoStores = stores.slice();
   window.catalogStatus = 'loading';
   async function loadCatalog() {

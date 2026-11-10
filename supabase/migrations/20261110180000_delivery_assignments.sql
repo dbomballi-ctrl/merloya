@@ -17,6 +17,14 @@ create index if not exists delivery_assignments_courier_idx
   on public.delivery_assignments(courier_id, assigned_at desc);
 alter table public.delivery_assignments enable row level security;
 
+drop policy if exists "couriers read assigned delivery orders" on public.orders;
+create policy "couriers read assigned delivery orders"
+on public.orders for select to authenticated
+using (exists (
+  select 1 from public.delivery_assignments da
+  where da.order_id = orders.id and da.courier_id = auth.uid()
+));
+
 drop policy if exists "related users read delivery assignments" on public.delivery_assignments;
 create policy "related users read delivery assignments"
 on public.delivery_assignments for select to authenticated

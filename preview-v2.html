@@ -198,7 +198,7 @@ async function renderAdminDeliveryAssignments(){
   const courierOptions=(couriers||[]).map(c=>'<option value="'+esc(c.id)+'">'+esc(c.nombre||'Repartidor')+'</option>').join('');
   container.innerHTML+='<section style="border:1px solid var(--line);border-radius:12px;padding:12px;margin:12px 0"><h3>Asignación de repartidores</h3>'+
     ((couriers||[]).length?orders.map(o=>{
-      const a=assigned.get(o.id),finished=a?.status==='delivered';
+      const a=assigned.get(o.id),finished=['picked_up','delivered'].includes(a?.status);
       return '<div style="border-bottom:1px solid var(--line);padding:10px 0"><b>Pedido '+esc(o.id.slice(0,8))+' · '+money(Number(o.total_amount))+'</b><p class="muted">'+new Date(o.created_at).toLocaleString('es-AR')+' · '+esc(a?.status||'Sin asignar')+'</p>'+
         '<select id="courier-'+esc(o.id)+'" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:9px;margin:5px 0" '+(finished?'disabled':'')+'><option value="">Seleccionar repartidor</option>'+courierOptions+'</select>'+
         '<button class="pill" data-assign-order="'+esc(o.id)+'" type="button" '+(finished?'disabled':'')+'>'+(a?'Reasignar':'Asignar')+'</button></div>';

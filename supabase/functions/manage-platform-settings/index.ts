@@ -62,6 +62,7 @@ Deno.serve(async (req) => {
         return json({ error: "Hay tramos con etiqueta, distancia o importe inválido." }, 400);
       }
       normalized.sort((a: any, b: any) => a.min_km - b.min_km);
+      normalized.forEach((rate: any, index: number) => rate.sort_order = index + 1);
       for (let i = 1; i < normalized.length; i++) {
         const previous = normalized[i - 1];
         if (previous.max_km === null || normalized[i].min_km <= previous.max_km) {

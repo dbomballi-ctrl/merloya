@@ -23,6 +23,7 @@ Aplicar en orden, primero en un proyecto Supabase de staging:
 4. `20261110150000_atomic_payment_proof_submission.sql`
 5. `20261110160000_atomic_payment_review.sql`
 6. `20261110170000_profile_signup_trigger.sql`
+7. `20261110180000_delivery_assignments.sql`
 
 Las migraciones deben ejecutarse una sola vez por entorno y verificarse contra el esquema real antes de producción. No ejecutar manualmente solo una migración posterior: las RPC dependen de las tablas creadas por la primera.
 
@@ -34,6 +35,7 @@ Desplegar estas funciones desde el proyecto Supabase correcto:
 - `submit-transfer-proof`
 - `review-transfer-payment`
 - `manage-platform-settings` (solo administración)
+- `manage-delivery-assignment` (administración y repartidores autenticados)
 
 Variables requeridas en el entorno de Edge Functions:
 
@@ -77,7 +79,8 @@ Antes de una prueba end-to-end deben configurarse en staging:
 ## Límites actuales
 
 - No se procesa dinero automáticamente: el pago es por transferencia y revisión humana.
-- No hay asignación de repartidores ni tracking de entrega implementados en este circuito.
-- El retiro en comercio todavía no está implementado en el checkout.
+- La asignación manual de repartidores y los estados asignado/retirado/entregado están implementados; no hay tracking GPS en tiempo real.
+- El retiro por parte del cliente en el comercio todavía no está implementado en el checkout.
+- Los perfiles con rol `repartidor` deben ser habilitados por administración; no existe alta pública de repartidores.
 - No se ha ejecutado una prueba real contra staging, porque el repositorio no proporciona acceso administrativo ni secretos de Supabase/Vercel.
 - No se debe fusionar a `main` ni desplegar a producción hasta completar las pruebas anteriores y revisar las tarifas/destinos bancarios reales.

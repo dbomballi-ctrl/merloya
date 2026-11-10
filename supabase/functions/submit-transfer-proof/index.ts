@@ -28,7 +28,7 @@ Deno.serve(async (req) => {
     }
     const { data: payment } = await db.from("transfer_payments")
       .select("id,order_id,status").eq("id", payment_id).single();
-    if (!payment || !["awaiting_transfer", "rejected"].includes(payment.status)) {
+    if (!payment || !["awaiting_transfer", "rejected", "proof_submitted"].includes(payment.status)) {
       return json({ error: "El pago no admite un nuevo comprobante." }, 409);
     }
     const { data: order } = await db.from("orders").select("customer_id").eq("id", payment.order_id).single();

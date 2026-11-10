@@ -1,6 +1,12 @@
 -- Manual courier assignment and delivery status tracking.
 begin;
 
+-- The courier role is provisioned only by administrators, never by public signup.
+alter table public.profiles drop constraint if exists profiles_role_check;
+alter table public.profiles
+  add constraint profiles_role_check
+  check (role = any (array['usuario'::text, 'comercio'::text, 'admin'::text, 'repartidor'::text]));
+
 create table if not exists public.delivery_assignments (
   id uuid primary key default gen_random_uuid(),
   order_id uuid not null unique references public.orders(id) on delete cascade,
@@ -23,23 +29,23 @@ create or replace function public.merlo_is_current_user_assigned_courier(p_order
 returns boolean
 language sql stable security definer
 set search_path = public, pg_temp
-as $
+as $$
   select exists (
     select 1 from public.delivery_assignments da
     where da.order_id = p_order_id and da.courier_id = auth.uid()
   );
-$;
+$$;
 
 create or replace function public.merlo_is_current_user_order_customer(p_order_id uuid)
 returns boolean
 language sql stable security definer
 set search_path = public, pg_temp
-as $
+as $$
   select exists (
     select 1 from public.orders o
     where o.id = p_order_id and o.customer_id = auth.uid()
   );
-$;
+$$;
 
 revoke all on function public.merlo_is_current_user_assigned_courier(uuid) from public, anon;
 revoke all on function public.merlo_is_current_user_order_customer(uuid) from public, anon;
@@ -74,7 +80,7 @@ returns jsonb
 language plpgsql
 security definer
 set search_path = public, pg_temp
-as $
+as $$
 declare
   v_assignment public.delivery_assignments%rowtype;
   v_role text;
@@ -117,7 +123,7 @@ begin
 
   return jsonb_build_object('order_id', p_order_id, 'status', p_next_status);
 end;
-$;
+$$;
 
 revoke all on function public.update_merlo_delivery_status(uuid, text, uuid)
   from public, anon, authenticated;

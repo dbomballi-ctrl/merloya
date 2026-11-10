@@ -119,6 +119,20 @@ async function renderAccount(user){
     document.querySelectorAll('[data-proof]').forEach(btn=>btn.addEventListener('click',()=>uploadPaymentProof(btn.dataset.proof,btn)));
   }else if(profile.role==='comercio'||profile.role==='admin'){
     let merchantSettings='';
+    if(profile.role==='admin'){
+      const [{data:platform},{data:rates}]=await Promise.all([
+        db.from('platform_settings').select('account_holder,bank_name,cbu,alias').eq('id',true).maybeSingle(),
+        db.from('delivery_rate_tiers').select('id,label,min_km,max_km,fee,active').order('sort_order')
+      ]);
+      merchantSettings='<section style="border:1px solid var(--line);border-radius:12px;padding:12px;margin:12px 0"><h3>Cuenta de Merlo Ya</h3>'+
+        '<label class="muted">Titular</label><input id="platformHolder" value="'+esc(platform?.account_holder||'')+'" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:9px;margin:5px 0 10px">'+
+        '<label class="muted">Banco o billetera</label><input id="platformBank" value="'+esc(platform?.bank_name||'')+'" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:9px;margin:5px 0 10px">'+
+        '<label class="muted">Alias</label><input id="platformAlias" value="'+esc(platform?.alias||'')+'" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:9px;margin:5px 0 10px">'+
+        '<label class="muted">CBU</label><input id="platformCbu" value="'+esc(platform?.cbu||'')+'" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:9px;margin:5px 0 10px">'+
+        '<button class="primary" type="button" onclick="savePlatformAccount()">Guardar cuenta de Merlo Ya</button></section>'+
+        '<section style="border:1px solid var(--line);border-radius:12px;padding:12px;margin:12px 0"><h3>Tarifas de delivery</h3><div id="deliveryRates">'+(rates||[]).filter(x=>x.active).map(x=>'<div data-rate-row data-rate-id="'+esc(x.id)+'" style="border-bottom:1px solid var(--line);padding:10px 0"><label class="muted">Nombre del tramo</label><input data-rate-label value="'+esc(x.label)+'" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:8px;margin:4px 0"><div style="display:flex;gap:7px"><input data-rate-min type="number" min="0" step="0.01" value="'+esc(x.min_km)+'" placeholder="Desde km" style="width:33%;padding:9px;border:1px solid var(--line);border-radius:8px"><input data-rate-max type="number" min="0" step="0.01" value="'+esc(x.max_km??'')+'" placeholder="Hasta km (vacío = sin límite)" style="width:33%;padding:9px;border:1px solid var(--line);border-radius:8px"><input data-rate-fee type="number" min="0" step="0.01" value="'+esc(x.fee)+'" placeholder="Importe ARS" style="width:34%;padding:9px;border:1px solid var(--line);border-radius:8px"></div><button class="pill" type="button" onclick="this.closest(\'[data-rate-row]\').remove()">Quitar tramo</button></div>').join('')+'</div>'+
+        '<button class="pill" type="button" onclick="addDeliveryRateRow()">Agregar tramo</button><button class="primary" style="margin-top:8px" type="button" onclick="saveDeliveryRates()">Guardar tarifas</button><p id="adminSettingsNote" class="notice">Los importes se expresan en ARS. Los tramos no pueden superponerse.</p></section>';
+    }
     if(profile.role==='comercio'){
       const [{data:account},{data:location}]=await Promise.all([
         db.from('merchant_payment_accounts').select('account_holder,bank_name,cbu,alias').eq('merchant_id',user.id).maybeSingle(),
@@ -156,6 +170,29 @@ async function renderAccount(user){
   }else{
     document.getElementById('cartLines').innerHTML='<p class="notice">Este perfil no tiene acceso a un panel operativo.</p>';
   }
+}
+function addDeliveryRateRow(){
+  const container=document.getElementById('deliveryRates');if(!container)return;
+  const row=document.createElement('div');row.setAttribute('data-rate-row','');
+  row.style.cssText='border-bottom:1px solid var(--line);padding:10px 0';
+  row.innerHTML='<label class="muted">Nombre del tramo</label><input data-rate-label placeholder="Ej. Hasta 5 km" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:8px;margin:4px 0"><div style="display:flex;gap:7px"><input data-rate-min type="number" min="0" step="0.01" placeholder="Desde km" style="width:33%;padding:9px;border:1px solid var(--line);border-radius:8px"><input data-rate-max type="number" min="0" step="0.01" placeholder="Hasta km (vacío = sin límite)" style="width:33%;padding:9px;border:1px solid var(--line);border-radius:8px"><input data-rate-fee type="number" min="0" step="0.01" placeholder="Importe ARS" style="width:34%;padding:9px;border:1px solid var(--line);border-radius:8px"></div><button class="pill" type="button" onclick="this.closest(\'[data-rate-row]\').remove()">Quitar tramo</button>';
+  container.appendChild(row);
+}
+async function savePlatformAccount(){
+  const body={action:'save_account',account_holder:document.getElementById('platformHolder').value.trim(),bank_name:document.getElementById('platformBank').value.trim(),alias:document.getElementById('platformAlias').value.trim(),cbu:document.getElementById('platformCbu').value.trim()};
+  const note=document.getElementById('adminSettingsNote')||document.getElementById('cartLines');
+  const {data,error}=await window.merloDb.functions.invoke('manage-platform-settings',{body});
+  if(error||!data?.success){note.textContent=data?.error||error?.message||'No se pudo guardar la cuenta.';return}
+  alert('Cuenta de Merlo Ya actualizada.');
+}
+async function saveDeliveryRates(){
+  const rows=[...document.querySelectorAll('[data-rate-row]')];
+  const rates=rows.map(row=>({id:row.dataset.rateId||undefined,label:row.querySelector('[data-rate-label]').value.trim(),min_km:row.querySelector('[data-rate-min]').value,max_km:row.querySelector('[data-rate-max]').value||null,fee:row.querySelector('[data-rate-fee]').value}));
+  const note=document.getElementById('adminSettingsNote');
+  const {data,error}=await window.merloDb.functions.invoke('manage-platform-settings',{body:{action:'save_rates',rates}});
+  if(error||!data?.success){note.textContent=data?.error||error?.message||'No se pudieron guardar las tarifas.';return}
+  note.textContent='Tarifas guardadas ('+data.saved+' tramos).';
+  await renderAccount((await window.merloDb.auth.getUser()).data.user);
 }
 function captureMerchantLocation(){
   const note=document.getElementById('merchantSettingsNote');

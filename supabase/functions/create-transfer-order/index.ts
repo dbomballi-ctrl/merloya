@@ -2,7 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const cors = {
   "Access-Control-Allow-Origin": Deno.env.get("APP_ORIGIN") ?? "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, idempotency-key",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 const json = (body: unknown, status = 200) =>
@@ -24,6 +24,10 @@ Deno.serve(async (req) => {
   const db = createClient(url, serviceKey);
 
   try {
+    const idempotencyKey = req.headers.get("Idempotency-Key") ?? "";
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(idempotencyKey)) {
+      return json({ error: "Falta una clave de idempotencia válida para este checkout." }, 400);
+    }
     const body = await req.json();
     const address = String(body.delivery_address ?? "").trim();
     const zone = String(body.delivery_zone ?? "").trim();
@@ -39,6 +43,16 @@ Deno.serve(async (req) => {
     if (items.some(x => !x.product_id || !Number.isInteger(x.quantity) || x.quantity < 1 || x.quantity > 99)) {
       return json({ error: "Hay productos o cantidades inválidas." }, 400);
     }
+    const fingerprintPayload = {
+      customer_id: user.id, delivery_address: address, delivery_zone: zone,
+      customer_phone: phone, delivery_latitude: lat, delivery_longitude: lon,
+      items: items.map(x => ({ product_id: x.product_id, quantity: x.quantity }))
+        .sort((a, b) => a.product_id.localeCompare(b.product_id) || a.quantity - b.quantity),
+    };
+    const fingerprintBytes = new TextEncoder().encode(JSON.stringify(fingerprintPayload));
+    const fingerprintDigest = await crypto.subtle.digest("SHA-256", fingerprintBytes);
+    const requestFingerprint = Array.from(new Uint8Array(fingerprintDigest))
+      .map(byte => byte.toString(16).padStart(2, "0")).join("");
 
     const { data: customer } = await db.from("profiles").select("id,role").eq("id", user.id).maybeSingle();
     if (!customer || customer.role !== "usuario") return json({ error: "La cuenta debe ser de cliente." }, 403);
@@ -98,67 +112,96 @@ Deno.serve(async (req) => {
       const route = await routeResponse.json();
       if (route.code !== "Ok" || !route.routes?.[0]) return json({ error: `No hay recorrido disponible desde ${merchant.nombre}.` }, 422);
       const km = Number(route.routes[0].distance) / 1000;
-      const tier = rates.find(r => km >= Number(r.min_km) && (r.max_km === null || km <= Number(r.max_km)));
+      const tier = rates.find(r => km >= Number(r.min_km) && (r.max_km === null || km < Number(r.max_km)));
       if (!tier) return json({ error: `No hay tarifa configurada para ${km.toFixed(1)} km.` }, 409);
       const subtotal = lines.reduce((sum, x) => sum + Number(x.product.precio) * x.quantity, 0);
       subtotalTotal += subtotal; shippingTotal += Number(tier.fee);
       calculated.push({
         merchantId, merchant, bank, lines, subtotal, km, tier,
-        shipping: Number(tier.fee),
+        shipping: Number(tier.fee), merchantOrderId: crypto.randomUUID(),
       });
     }
 
     const total = subtotalTotal + shippingTotal;
-    const { data: order, error: orderError } = await db.from("orders").insert({
-      customer_id: user.id, delivery_address: address, delivery_zone: zone || null,
-      delivery_latitude: lat, delivery_longitude: lon, customer_phone: phone || null,
-      subtotal: subtotalTotal, shipping_total: shippingTotal, total_amount: total,
-      status: "awaiting_transfers",
-    }).select().single();
-    if (orderError || !order) throw orderError ?? new Error("No se pudo crear el pedido.");
+    // IDs estables para que todas las filas relacionadas se inserten en una única transacción SQL.
+    const merchantOrderRows = calculated.map((part) => ({
+      id: part.merchantOrderId, merchant_id: part.merchantId, subtotal: part.subtotal,
+      route_distance_km: part.km, shipping_fee: part.shipping, delivery_rate_tier_id: part.tier.id,
+      delivery_address_snapshot: address, merchant_name_snapshot: part.merchant.nombre,
+    }));
+    const itemRows = calculated.flatMap((part) => part.lines.map((x: any) => ({
+      merchant_order_id: part.merchantOrderId, product_id: x.product.id,
+      product_name_snapshot: x.product.nombre, unit_price: Number(x.product.precio), quantity: x.quantity,
+    })));
+    const paymentRows = calculated.flatMap((part) => [
+      { merchant_order_id: part.merchantOrderId, payee_type: "merchant", merchant_id: part.merchantId,
+        amount: part.subtotal, destination_snapshot: part.bank },
+      { merchant_order_id: part.merchantOrderId, payee_type: "merlo_ya", merchant_id: null,
+        amount: part.shipping, destination_snapshot: platformAccount },
+    ].filter((payment) => payment.amount > 0));
 
-    const obligations: any[] = [];
-    const summaries: any[] = [];
-    for (const part of calculated) {
-      const { data: merchantOrder, error: merchantOrderError } = await db.from("merchant_orders").insert({
-        order_id: order.id, merchant_id: part.merchantId, subtotal: part.subtotal,
-        route_distance_km: part.km, shipping_fee: part.shipping, delivery_rate_tier_id: part.tier.id,
-        delivery_address_snapshot: address, merchant_name_snapshot: part.merchant.nombre,
-      }).select().single();
-      if (merchantOrderError || !merchantOrder) throw merchantOrderError ?? new Error("No se pudo crear el subpedido.");
-
-      const itemRows = part.lines.map((x: any) => ({
-        merchant_order_id: merchantOrder.id, product_id: x.product.id,
-        product_name_snapshot: x.product.nombre, unit_price: Number(x.product.precio), quantity: x.quantity,
-      }));
-      const { error: itemError } = await db.from("order_items").insert(itemRows);
-      if (itemError) throw itemError;
-
-      const destinations = [
-        { payee_type: "merchant", merchant_id: part.merchantId, amount: part.subtotal,
-          destination_snapshot: part.bank },
-        { payee_type: "merlo_ya", merchant_id: null, amount: part.shipping,
-          destination_snapshot: platformAccount },
-      ];
-      for (const d of destinations) {
-        if (d.amount <= 0) continue;
-        obligations.push({
-          order_id: order.id, merchant_order_id: merchantOrder.id, payee_type: d.payee_type,
-          merchant_id: d.merchant_id, amount: d.amount, destination_snapshot: d.destination_snapshot,
-        });
+    const { data: transaction, error: transactionError } = await db.rpc("create_merlo_transfer_order", {
+      p_idempotency_key: idempotencyKey,
+      p_request_fingerprint: requestFingerprint,
+      p_order: {
+        customer_id: user.id, delivery_address: address, delivery_zone: zone || null,
+        delivery_latitude: lat, delivery_longitude: lon, customer_phone: phone || null,
+        subtotal: subtotalTotal, shipping_total: shippingTotal, total_amount: total,
+        status: "awaiting_transfers",
+      },
+      p_merchant_orders: merchantOrderRows,
+      p_order_items: itemRows,
+      p_transfer_payments: paymentRows,
+    });
+    if (transactionError) {
+      if (transactionError.message?.includes("IDEMPOTENCY_KEY_REUSED")) {
+        return json({ error: "La clave de checkout ya fue utilizada con datos diferentes. Iniciá un nuevo checkout." }, 409);
       }
-      summaries.push({
-        merchant_order_id: merchantOrder.id, merchant: part.merchant.nombre,
+      throw transactionError;
+    }
+    const orderId = transaction?.order_id;
+    if (!orderId) throw new Error("No se pudo confirmar la creación transaccional del pedido.");
+
+    const { data: payments, error: paymentsError } = await db.from("transfer_payments")
+      .select("id,merchant_order_id,payee_type,merchant_id,amount,destination_snapshot,status")
+      .eq("order_id", orderId);
+    if (paymentsError) throw paymentsError;
+
+    let summaries;
+    let responseSubtotal = subtotalTotal, responseShipping = shippingTotal, responseTotal = total;
+    if (transaction.replayed) {
+      const [{ data: savedOrder, error: savedOrderError }, { data: savedMerchants, error: savedMerchantsError }] = await Promise.all([
+        db.from("orders").select("subtotal,shipping_total,total_amount").eq("id", orderId).single(),
+        db.from("merchant_orders").select("id,subtotal,route_distance_km,shipping_fee,merchant_name_snapshot,delivery_rate_tier_id").eq("order_id", orderId),
+      ]);
+      if (savedOrderError || savedMerchantsError || !savedOrder || !savedMerchants) {
+        throw savedOrderError ?? savedMerchantsError ?? new Error("No se pudo recuperar el pedido existente.");
+      }
+      const tierIds = [...new Set(savedMerchants.map((x: any) => x.delivery_rate_tier_id).filter(Boolean))];
+      const { data: savedTiers, error: savedTiersError } = tierIds.length
+        ? await db.from("delivery_rate_tiers").select("id,label").in("id", tierIds)
+        : { data: [], error: null };
+      if (savedTiersError) throw savedTiersError;
+      const tierLabels = new Map((savedTiers ?? []).map((x: any) => [x.id, x.label]));
+      summaries = savedMerchants.map((part: any) => ({
+        merchant_order_id: part.id, merchant: part.merchant_name_snapshot,
+        subtotal: Number(part.subtotal), route_distance_km: Number(Number(part.route_distance_km).toFixed(2)),
+        shipping: Number(part.shipping_fee), rate: tierLabels.get(part.delivery_rate_tier_id) ?? "Tarifa aplicada",
+      }));
+      responseSubtotal = Number(savedOrder.subtotal);
+      responseShipping = Number(savedOrder.shipping_total);
+      responseTotal = Number(savedOrder.total_amount);
+    } else {
+      summaries = calculated.map((part) => ({
+        merchant_order_id: part.merchantOrderId, merchant: part.merchant.nombre,
         subtotal: part.subtotal, route_distance_km: Number(part.km.toFixed(2)),
         shipping: part.shipping, rate: part.tier.label,
-      });
+      }));
     }
-    const { data: payments, error: paymentError } = await db.from("transfer_payments")
-      .insert(obligations).select("id,merchant_order_id,payee_type,merchant_id,amount,destination_snapshot,status");
-    if (paymentError) throw paymentError;
 
-    return json({ order_id: order.id, subtotal: subtotalTotal, shipping_total: shippingTotal,
-      total, merchant_orders: summaries, payments });
+    return json({ order_id: orderId, replayed: Boolean(transaction.replayed),
+      subtotal: responseSubtotal, shipping_total: responseShipping,
+      total: responseTotal, merchant_orders: summaries, payments });
   } catch (error) {
     console.error(error);
     return json({ error: error instanceof Error ? error.message : "Error interno al crear el pedido." }, 500);

@@ -1,0 +1,66 @@
+name: Supabase Edge Functions
+
+on:
+  pull_request:
+    branches: [main, merlo-ya-2.0-dev]
+    paths:
+      - "supabase/functions/**"
+      - "preview-v2.html"
+      - ".github/workflows/supabase-functions.yml"
+  push:
+    branches: [main, merlo-ya-2.0-dev]
+    paths:
+      - "supabase/functions/**"
+      - "preview-v2.html"
+      - ".github/workflows/supabase-functions.yml"
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Type-check Edge Functions
+        run: |
+          deno check supabase/functions/create-transfer-order/index.ts
+          deno check supabase/functions/submit-transfer-proof/index.ts
+          deno check supabase/functions/review-transfer-payment/index.ts
+          deno check supabase/functions/manage-platform-settings/index.ts
+          deno check supabase/functions/manage-delivery-assignment/index.ts
+      - name: Check inline JavaScript and static HTML IDs
+        run: |
+          python3 - <<'PY'
+          from html.parser import HTMLParser
+          from pathlib import Path
+          import re
+          import subprocess
+
+          html = Path("preview-v2.html").read_text(encoding="utf-8")
+          scripts = re.findall(r'<script\b(?![^>]*\bsrc\s*=)[^>]*>(.*?)</script\s*>', html, re.I | re.S)
+          if not scripts:
+              raise SystemExit("No inline JavaScript found in preview-v2.html")
+          for index, source in enumerate(scripts):
+              path = Path(f"/tmp/merlo-inline-{index}.js")
+              path.write_text(source, encoding="utf-8")
+              subprocess.run(["node", "--check", str(path)], check=True)
+
+          class IdChecker(HTMLParser):
+              def __init__(self):
+                  super().__init__()
+                  self.seen = set()
+                  self.duplicates = set()
+              def handle_starttag(self, tag, attrs):
+                  element_id = dict(attrs).get("id")
+                  if element_id:
+                      if element_id in self.seen:
+                          self.duplicates.add(element_id)
+                      self.seen.add(element_id)
+
+          checker = IdChecker()
+          checker.feed(html)
+          if checker.duplicates:
+              raise SystemExit("Duplicate HTML IDs: " + ", ".join(sorted(checker.duplicates)))
+          print(f"Checked {len(scripts)} inline script(s) and {len(checker.seen)} unique IDs.")
+          PY

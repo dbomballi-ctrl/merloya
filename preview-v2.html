@@ -97,7 +97,7 @@ async function submitCheckout(){
     if(!data||!data.order_id)throw new Error(data?.error||'El servidor no confirmó la creación del pedido.');
     document.getElementById('cartLines').innerHTML='<h3>Pedido creado</h3><p class="notice">Número de pedido: '+esc(data.order_id)+'</p>'+(data.payments||[]).map(p=>'<div class="cart-line"><div><b>'+(p.payee_type==='merchant'?'Transferencia al comercio':'Envío · Merlo Ya')+'</b><div class="muted">'+money(Number(p.amount))+'</div><div class="notice">'+esc(p.destination_snapshot?.bank_name||'')+' · '+esc(p.destination_snapshot?.account_holder||'')+'</div><div class="notice">CBU: '+esc(p.destination_snapshot?.cbu||'—')+'<br>Alias: '+esc(p.destination_snapshot?.alias||'—')+'</div></div></div>').join('')+'<p class="notice">Transferí cada importe por separado. El pedido queda sujeto a revisión de comprobantes.</p>';
     document.getElementById('cartBottom').innerHTML='<button class="primary" type="button" onclick="closeCart()">Cerrar</button>';
-    cart=[];updateCart();
+    cart=[];document.getElementById('cartCount').textContent='0';
   }catch(e){error.textContent=e.message||'No se pudo crear el pedido. Verificá los datos e intentá nuevamente.';button.disabled=false;button.textContent='Reintentar'}
   finally{checkoutBusy=false}
 }

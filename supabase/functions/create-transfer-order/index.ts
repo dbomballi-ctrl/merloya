@@ -104,60 +104,53 @@ Deno.serve(async (req) => {
       subtotalTotal += subtotal; shippingTotal += Number(tier.fee);
       calculated.push({
         merchantId, merchant, bank, lines, subtotal, km, tier,
-        shipping: Number(tier.fee),
+        shipping: Number(tier.fee), merchantOrderId: crypto.randomUUID(),
       });
     }
 
     const total = subtotalTotal + shippingTotal;
-    const { data: order, error: orderError } = await db.from("orders").insert({
-      customer_id: user.id, delivery_address: address, delivery_zone: zone || null,
-      delivery_latitude: lat, delivery_longitude: lon, customer_phone: phone || null,
-      subtotal: subtotalTotal, shipping_total: shippingTotal, total_amount: total,
-      status: "awaiting_transfers",
-    }).select().single();
-    if (orderError || !order) throw orderError ?? new Error("No se pudo crear el pedido.");
+    // IDs estables para que todas las filas relacionadas se inserten en una única transacción SQL.
+    const merchantOrderRows = calculated.map((part) => ({
+      id: part.merchantOrderId, merchant_id: part.merchantId, subtotal: part.subtotal,
+      route_distance_km: part.km, shipping_fee: part.shipping, delivery_rate_tier_id: part.tier.id,
+      delivery_address_snapshot: address, merchant_name_snapshot: part.merchant.nombre,
+    }));
+    const itemRows = calculated.flatMap((part) => part.lines.map((x: any) => ({
+      merchant_order_id: part.merchantOrderId, product_id: x.product.id,
+      product_name_snapshot: x.product.nombre, unit_price: Number(x.product.precio), quantity: x.quantity,
+    })));
+    const paymentRows = calculated.flatMap((part) => [
+      { merchant_order_id: part.merchantOrderId, payee_type: "merchant", merchant_id: part.merchantId,
+        amount: part.subtotal, destination_snapshot: part.bank },
+      { merchant_order_id: part.merchantOrderId, payee_type: "merlo_ya", merchant_id: null,
+        amount: part.shipping, destination_snapshot: platformAccount },
+    ].filter((payment) => payment.amount > 0));
 
-    const obligations: any[] = [];
-    const summaries: any[] = [];
-    for (const part of calculated) {
-      const { data: merchantOrder, error: merchantOrderError } = await db.from("merchant_orders").insert({
-        order_id: order.id, merchant_id: part.merchantId, subtotal: part.subtotal,
-        route_distance_km: part.km, shipping_fee: part.shipping, delivery_rate_tier_id: part.tier.id,
-        delivery_address_snapshot: address, merchant_name_snapshot: part.merchant.nombre,
-      }).select().single();
-      if (merchantOrderError || !merchantOrder) throw merchantOrderError ?? new Error("No se pudo crear el subpedido.");
+    const { data: orderId, error: transactionError } = await db.rpc("create_merlo_transfer_order", {
+      p_order: {
+        customer_id: user.id, delivery_address: address, delivery_zone: zone || null,
+        delivery_latitude: lat, delivery_longitude: lon, customer_phone: phone || null,
+        subtotal: subtotalTotal, shipping_total: shippingTotal, total_amount: total,
+        status: "awaiting_transfers",
+      },
+      p_merchant_orders: merchantOrderRows,
+      p_order_items: itemRows,
+      p_transfer_payments: paymentRows,
+    });
+    if (transactionError || !orderId) throw transactionError ?? new Error("No se pudo confirmar la creación transaccional del pedido.");
 
-      const itemRows = part.lines.map((x: any) => ({
-        merchant_order_id: merchantOrder.id, product_id: x.product.id,
-        product_name_snapshot: x.product.nombre, unit_price: Number(x.product.precio), quantity: x.quantity,
-      }));
-      const { error: itemError } = await db.from("order_items").insert(itemRows);
-      if (itemError) throw itemError;
+    const { data: payments, error: paymentsError } = await db.from("transfer_payments")
+      .select("id,merchant_order_id,payee_type,merchant_id,amount,destination_snapshot,status")
+      .eq("order_id", orderId);
+    if (paymentsError) throw paymentsError;
 
-      const destinations = [
-        { payee_type: "merchant", merchant_id: part.merchantId, amount: part.subtotal,
-          destination_snapshot: part.bank },
-        { payee_type: "merlo_ya", merchant_id: null, amount: part.shipping,
-          destination_snapshot: platformAccount },
-      ];
-      for (const d of destinations) {
-        if (d.amount <= 0) continue;
-        obligations.push({
-          order_id: order.id, merchant_order_id: merchantOrder.id, payee_type: d.payee_type,
-          merchant_id: d.merchant_id, amount: d.amount, destination_snapshot: d.destination_snapshot,
-        });
-      }
-      summaries.push({
-        merchant_order_id: merchantOrder.id, merchant: part.merchant.nombre,
-        subtotal: part.subtotal, route_distance_km: Number(part.km.toFixed(2)),
-        shipping: part.shipping, rate: part.tier.label,
-      });
-    }
-    const { data: payments, error: paymentError } = await db.from("transfer_payments")
-      .insert(obligations).select("id,merchant_order_id,payee_type,merchant_id,amount,destination_snapshot,status");
-    if (paymentError) throw paymentError;
+    const summaries = calculated.map((part) => ({
+      merchant_order_id: part.merchantOrderId, merchant: part.merchant.nombre,
+      subtotal: part.subtotal, route_distance_km: Number(part.km.toFixed(2)),
+      shipping: part.shipping, rate: part.tier.label,
+    }));
 
-    return json({ order_id: order.id, subtotal: subtotalTotal, shipping_total: shippingTotal,
+    return json({ order_id: orderId, subtotal: subtotalTotal, shipping_total: shippingTotal,
       total, merchant_orders: summaries, payments });
   } catch (error) {
     console.error(error);

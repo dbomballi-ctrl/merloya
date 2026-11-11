@@ -434,33 +434,31 @@ async function submitMerchantProfile(){
   note.textContent='Solicitud enviada. Se publicará cuando Merlo Ya la apruebe.';
 }
 
+
 async function adminCatalogAction(body){
   const {data,error}=await window.merloDb.functions.invoke('admin-catalog',{body});
   if(error||!data?.success)throw new Error(data?.error||error?.message||'No se pudo completar la operación.');
   return data;
 }
 async function renderAdminCatalogManager(){
-  const root=document.createElement('div');
-  root.className='catalog-manager';
-  root.innerHTML='<h3>Administración completa del catálogo</h3><p class="notice">Alta y edición directa de comercios y productos. Las publicaciones aprobadas quedan visibles; los comercios pausados y productos no aprobados no se pueden comprar.</p><p class="catalog-status">Cargando catálogo…</p>';
   try{
     const data=await adminCatalogAction({action:'list'});
-    const merchants=data.merchants||[], products=data.products||[], users=data.candidate_users||[];
+    const merchants=data.merchants||[],products=data.products||[],users=data.candidate_users||[];
     const merchantOptions=merchants.filter(x=>x.role==='comercio').map(x=>'<option value="'+esc(x.id)+'">'+esc(x.nombre)+' · '+esc(x.publication_status)+'</option>').join('');
     const candidateOptions=users.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.nombre||'Cuenta')+' · '+esc(x.id.slice(0,8))+'</option>').join('');
-    root.innerHTML='<h3>Administración completa del catálogo</h3>'+
-      '<details open><summary><b>Crear o habilitar comercio</b></summary><p class="catalog-status">Seleccioná una cuenta existente o completá los datos de un comercio nuevo ya registrado como cliente.</p>'+
-      '<label class="muted">Cuenta de usuario</label><select id="adminStoreUser" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:9px"><option value="">Seleccionar cuenta</option>'+candidateOptions+'</select>'+
+    return '<section class="catalog-manager"><h3>Administración completa del catálogo</h3><p class="notice">Altas, edición, publicación, pausa y eliminación. Los pedidos históricos conservan su detalle aunque se elimine un producto.</p>'+
+      '<details open><summary><b>Crear o habilitar comercio</b></summary><p class="catalog-status">Elegí una cuenta existente que todavía no sea comercio.</p>'+
+      '<label class="muted">Cuenta</label><select id="adminStoreUser" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:9px"><option value="">Seleccionar cuenta</option>'+candidateOptions+'</select>'+
       '<div class="form-field"><label>Nombre del comercio</label><input id="adminStoreName" maxlength="120"></div><div class="form-field"><label>Rubro</label><input id="adminStoreCategory" maxlength="80"></div>'+
       '<div class="form-field"><label>Zona</label><input id="adminStoreZone" maxlength="120"></div><div class="form-field"><label>Dirección para retiro</label><input id="adminStoreAddress" maxlength="250"></div>'+
       '<div class="form-field"><label>WhatsApp</label><input id="adminStoreWhatsapp" maxlength="40"></div><div class="form-field"><label>Foto HTTPS</label><input id="adminStoreImage" type="url"></div>'+
-      '<button class="primary" id="adminSaveStore" type="button">Guardar y publicar comercio</button></details>'+
+      '<button class="primary" type="button" onclick="adminSaveStore()">Guardar y publicar comercio</button></details>'+
       '<details open><summary><b>Crear producto</b></summary><div class="form-field"><label>Comercio</label><select id="adminProductStore"><option value="">Seleccionar comercio</option>'+merchantOptions+'</select></div>'+
       '<div class="form-field"><label>Nombre del producto</label><input id="adminNewProductName" maxlength="160"></div><div class="form-field"><label>Precio (ARS)</label><input id="adminNewProductPrice" type="number" min="0.01" step="0.01"></div>'+
       '<div class="form-field"><label>Foto HTTPS</label><input id="adminNewProductImage" type="url"></div><div class="form-field"><label>Descripción</label><input id="adminNewProductDesc" maxlength="500"></div>'+
-      '<button class="primary" id="adminCreateProduct" type="button">Crear y publicar producto</button></details>'+
+      '<button class="primary" type="button" onclick="adminCreateProduct()">Crear y publicar producto</button></details>'+
       '<h4>Comercios ('+merchants.filter(x=>x.role==='comercio').length+')</h4>'+
-      merchants.filter(x=>x.role==='comercio').map(m=>'<div class="catalog-product" data-admin-store="'+esc(m.id)+'"><div><b>'+esc(m.nombre)+'</b><div class="catalog-status">'+esc(m.rubro||'')+' · '+esc(m.zona||'')+' · '+(m.publication_status==='approved'?'Publicado':'Pausado')+'</div></div><div class="catalog-actions"><button type="button" data-toggle-store="'+esc(m.id)+'">'+(m.publication_status==='approved'?'Pausar':'Publicar')+'</button></div></div>').join('')+
+      merchants.filter(x=>x.role==='comercio').map(m=>'<div class="catalog-product"><div><b>'+esc(m.nombre)+'</b><div class="catalog-status">'+esc(m.rubro||'')+' · '+esc(m.zona||'')+' · '+(m.publication_status==='approved'?'Publicado':'Pausado')+'</div></div><div class="catalog-actions"><button type="button" onclick="adminToggleStore(\''+esc(m.id)+'\',\''+(m.publication_status==='approved'?'rejected':'approved')+'\')">'+(m.publication_status==='approved'?'Pausar':'Publicar')+'</button></div></div>').join('')+
       '<h4>Productos ('+products.length+')</h4>'+
       products.map(p=>'<div class="catalog-product" data-admin-product="'+esc(p.id)+'"><div class="catalog-product-fields"><input data-p-name value="'+esc(p.nombre)+'" maxlength="160" aria-label="Nombre">'+
         '<input data-p-price type="number" min="0.01" step="0.01" value="'+esc(p.precio)+'" aria-label="Precio"></div>'+
@@ -468,29 +466,32 @@ async function renderAdminCatalogManager(){
         '<input data-p-image value="'+esc(p.image_url||'')+'" placeholder="URL de foto HTTPS" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:9px;margin-top:6px">'+
         '<input data-p-desc value="'+esc(p.description||'')+'" placeholder="Descripción" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:9px;margin-top:6px">'+
         '<select data-p-status style="padding:8px;margin-top:6px"><option value="approved" '+(p.publication_status==='approved'?'selected':'')+'>Publicado</option><option value="pending" '+(p.publication_status==='pending'?'selected':'')+'>Pendiente</option><option value="rejected" '+(p.publication_status==='rejected'?'selected':'')+'>Pausado / rechazado</option></select>'+
-        '<div class="catalog-actions" style="margin-top:7px"><button type="button" data-save-product="'+esc(p.id)+'">Guardar cambios</button><button class="danger" type="button" data-delete-product="'+esc(p.id)+'">Eliminar</button></div></div>').join('')+
-      '<p id="adminCatalogStatus" class="catalog-status" role="status"></p>';
-    const note=()=>root.querySelector('#adminCatalogStatus');
-    root.querySelector('#adminSaveStore').addEventListener('click',async()=>{
-      try{const id=root.querySelector('#adminStoreUser').value;if(!id)throw new Error('Seleccioná una cuenta.');await adminCatalogAction({action:'save_merchant',id,nombre:root.querySelector('#adminStoreName').value,rubro:root.querySelector('#adminStoreCategory').value,zona:root.querySelector('#adminStoreZone').value,domicilio:root.querySelector('#adminStoreAddress').value,whatsapp:root.querySelector('#adminStoreWhatsapp').value,store_image_url:root.querySelector('#adminStoreImage').value});await refreshAdminCatalog()}catch(e){note().textContent=e.message}
-    });
-    root.querySelector('#adminCreateProduct').addEventListener('click',async()=>{
-      try{await adminCatalogAction({action:'save_product',comercio_id:root.querySelector('#adminProductStore').value,nombre:root.querySelector('#adminNewProductName').value,precio:root.querySelector('#adminNewProductPrice').value,image_url:root.querySelector('#adminNewProductImage').value,description:root.querySelector('#adminNewProductDesc').value,publication_status:'approved'});await refreshAdminCatalog()}catch(e){note().textContent=e.message}
-    });
-    root.querySelectorAll('[data-save-product]').forEach(btn=>btn.addEventListener('click',async()=>{
-      const row=btn.closest('[data-admin-product]');
-      try{await adminCatalogAction({action:'save_product',id:btn.dataset.saveProduct,comercio_id:row.querySelector('[data-p-store]').value,nombre:row.querySelector('[data-p-name]').value,precio:row.querySelector('[data-p-price]').value,image_url:row.querySelector('[data-p-image]').value,description:row.querySelector('[data-p-desc]').value,publication_status:row.querySelector('[data-p-status]').value});note().textContent='Producto actualizado.';await window.refreshPublicCatalog?.()}catch(e){note().textContent=e.message}
-    }));
-    root.querySelectorAll('[data-delete-product]').forEach(btn=>btn.addEventListener('click',async()=>{
-      if(!confirm('¿Eliminar este producto? Los pedidos anteriores conservarán su descripción y precio.'))return;
-      try{await adminCatalogAction({action:'delete_product',id:btn.dataset.deleteProduct});await refreshAdminCatalog()}catch(e){note().textContent=e.message}
-    }));
-    root.querySelectorAll('[data-toggle-store]').forEach(btn=>btn.addEventListener('click',async()=>{
-      const m=merchants.find(x=>x.id===btn.dataset.toggleStore),status=m.publication_status==='approved'?'rejected':'approved';
-      try{await adminCatalogAction({action:'set_merchant_status',id:m.id,status});await refreshAdminCatalog()}catch(e){note().textContent=e.message}
-    }));
-  }catch(e){root.innerHTML='<h3>Administración completa del catálogo</h3><p class="notice">'+esc(e.message)+'</p>'}
-  return root.outerHTML;
+        '<div class="catalog-actions" style="margin-top:7px"><button type="button" onclick="adminSaveProduct(\''+esc(p.id)+'\')">Guardar cambios</button><button class="danger" type="button" onclick="adminDeleteProduct(\''+esc(p.id)+'\')">Eliminar</button></div></div>').join('')+
+      '<p id="adminCatalogStatus" class="catalog-status" role="status"></p></section>';
+  }catch(e){return '<section class="catalog-manager"><h3>Administración completa del catálogo</h3><p class="notice">'+esc(e.message)+'</p></section>'}
+}
+function adminCatalogNote(message){const el=document.getElementById('adminCatalogStatus');if(el)el.textContent=message}
+async function adminSaveStore(){
+  try{const id=document.getElementById('adminStoreUser')?.value;if(!id)throw new Error('Seleccioná una cuenta.');
+    await adminCatalogAction({action:'save_merchant',id,nombre:document.getElementById('adminStoreName').value,rubro:document.getElementById('adminStoreCategory').value,zona:document.getElementById('adminStoreZone').value,domicilio:document.getElementById('adminStoreAddress').value,whatsapp:document.getElementById('adminStoreWhatsapp').value,store_image_url:document.getElementById('adminStoreImage').value});
+    await refreshAdminCatalog();
+  }catch(e){adminCatalogNote(e.message)}
+}
+async function adminCreateProduct(){
+  try{await adminCatalogAction({action:'save_product',comercio_id:document.getElementById('adminProductStore').value,nombre:document.getElementById('adminNewProductName').value,precio:document.getElementById('adminNewProductPrice').value,image_url:document.getElementById('adminNewProductImage').value,description:document.getElementById('adminNewProductDesc').value,publication_status:'approved'});await refreshAdminCatalog()}
+  catch(e){adminCatalogNote(e.message)}
+}
+async function adminSaveProduct(id){
+  const row=document.querySelector('[data-admin-product="'+id+'"]');if(!row)return;
+  try{await adminCatalogAction({action:'save_product',id,comercio_id:row.querySelector('[data-p-store]').value,nombre:row.querySelector('[data-p-name]').value,precio:row.querySelector('[data-p-price]').value,image_url:row.querySelector('[data-p-image]').value,description:row.querySelector('[data-p-desc]').value,publication_status:row.querySelector('[data-p-status]').value});adminCatalogNote('Producto actualizado.');await window.refreshPublicCatalog?.()}
+  catch(e){adminCatalogNote(e.message)}
+}
+async function adminDeleteProduct(id){
+  if(!confirm('¿Eliminar este producto? Los pedidos anteriores conservarán su descripción y precio.'))return;
+  try{await adminCatalogAction({action:'delete_product',id});await refreshAdminCatalog()}catch(e){adminCatalogNote(e.message)}
+}
+async function adminToggleStore(id,status){
+  try{await adminCatalogAction({action:'set_merchant_status',id,status});await refreshAdminCatalog()}catch(e){adminCatalogNote(e.message)}
 }
 async function refreshAdminCatalog(){
   const {data:{user}}=await window.merloDb.auth.getUser();

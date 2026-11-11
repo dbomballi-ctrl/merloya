@@ -86,12 +86,12 @@ function render(){
   const q=document.getElementById('search').value.trim().toLowerCase();
   const list=stores.filter(s=>(active==='Todos'||s.cat===active)&&(s.name+' '+s.desc+' '+s.products.map(p=>p[0]).join(' ')).toLowerCase().includes(q));
   document.getElementById('count').textContent=list.length+' comercios';
-  document.getElementById('stores').innerHTML=list.map(s=>'<article class="store"><div class="store-body"><h3>'+esc(s.name)+'</h3><div class="muted">'+esc(s.desc)+'</div><span class="tag">'+esc(s.cat)+'</span><button type="button" data-store="'+esc(s.name)+'">Ver '+s.products.length+' productos</button></div></article>').join('')||'<p class="muted">Todavía no hay comercios publicados con esos filtros.</p>';
+  document.getElementById('stores').innerHTML=list.map(s=>'<article class="store">'+(s.img?'<img src="'+esc(s.img)+'" alt="'+esc(s.name)+'" loading="lazy">':'')+'<div class="store-body"><h3>'+esc(s.name)+'</h3><div class="muted">'+esc(s.desc)+'</div><span class="tag">'+esc(s.cat)+'</span>'+(s.isDemo?'<span class="tag" style="margin-left:5px;background:#fff1e2;color:#9b5315">DEMO</span>':'')+'<button type="button" data-store="'+esc(s.name)+'">Ver '+s.products.length+' productos</button></div></article>').join('')||'<p class="muted">Todavía no hay comercios publicados con esos filtros.</p>';
   document.querySelectorAll('[data-store]').forEach(btn=>btn.addEventListener('click',()=>showProducts(btn.dataset.store)));
 }
 function showProducts(name){
   const s=stores.find(x=>x.name===name);if(!s)return;
-  document.getElementById('cartLines').innerHTML='<h3>'+esc(s.name)+'</h3>'+(s.products.length?s.products.map((p,i)=>'<div class="product-row"><div class="product-info"><b>'+esc(p[0])+'</b><div class="muted">'+money(Number(p[1])||0)+'</div></div><button class="product-add" type="button" data-add="'+i+'">Agregar</button></div>').join(''):'<div class="product-empty">Este comercio todavía no tiene productos publicados.</div>');
+  document.getElementById('cartLines').innerHTML='<h3>'+esc(s.name)+'</h3>'+(s.isDemo?'<p class="notice">Comercio de demostración. Los importes y productos son para pruebas.</p>':'')+(s.products.length?s.products.map((p,i)=>'<div class="product-row">'+(p[3]?'<img src="'+esc(p[3])+'" alt="'+esc(p[0])+'" loading="lazy" style="width:76px;height:76px;object-fit:cover;border-radius:12px;flex-shrink:0">':'')+'<div class="product-info"><b>'+esc(p[0])+'</b><div class="muted">'+money(Number(p[1])||0)+'</div>'+(p[4]?'<div class="muted">'+esc(p[4])+'</div>':'')+'</div>'+(s.orderable===false?'<span class="tag">Próximamente</span>':'<button class="product-add" type="button" data-add="'+i+'">Agregar</button>')+'</div>').join(''):'<div class="product-empty">Este comercio todavía no tiene productos publicados.</div>');
   document.querySelectorAll('[data-add]').forEach(btn=>btn.addEventListener('click',()=>add(name,Number(btn.dataset.add))));
   document.getElementById('cartBottom').innerHTML='<p class="notice">Podés combinar productos de distintos comercios en un mismo carrito.</p><button class="primary" onclick="openCart()">Ver carrito ('+cart.reduce((a,x)=>a+x.qty,0)+')</button>';
   document.getElementById('overlay').classList.add('open');
@@ -416,34 +416,34 @@ render();updateCart();
   }
   const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
   window.merloDb = db;
-  const demoStores = [];
+  const demoStores = [{name:'Sabores Serranos · DEMO',cat:'Comida',desc:'Cocina regional · Catálogo de prueba',img:'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=1200&q=85',products:[['Pizza artesanal',9800,null,'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=900&q=85','Masa casera y mozzarella.'],['Hamburguesa clásica',8900,null,'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=900&q=85','Carne, queso y vegetales.'],['Empanadas x 6',8400,null,'https://images.unsplash.com/photo-1601050690597-df0568f70950?auto=format&fit=crop&w=900&q=85','Surtidas, estilo casero.'],['Tarta de frutos rojos',7200,null,'https://images.unsplash.com/photo-1578985545062-69928b1d9587?auto=format&fit=crop&w=900&q=85','Tarta artesanal.']],isDemo:true,orderable:false}];
   window.catalogStatus = 'loading';
   async function loadCatalog() {
     try {
       const [{data: merchants, error: merchantError},{data: products, error: productError}] = await Promise.all([
-        db.from('public_merchants').select('id,nombre,rubro,zona'),
-        db.from('products').select('id,comercio_id,nombre,precio')
+        db.from('public_merchants').select('id,nombre,rubro,zona,store_image_url,is_demo'),
+        db.from('products').select('id,comercio_id,nombre,precio,image_url,description,is_demo,publication_status').eq('publication_status','approved')
       ]);
       if (merchantError) throw merchantError;
       if (productError) throw productError;
       const live = (merchants || []).map(m => {
         const items = (products || []).filter(p => p.comercio_id === m.id)
-          .map(p => [p.nombre, Number(p.precio) || 0, p.id]);
+          .map(p => [p.nombre, Number(p.precio) || 0, p.id, p.image_url || '', p.description || '', !!p.is_demo]);
         return {name:m.nombre || 'Comercio',cat:m.rubro || 'Comercios',
-          desc:m.zona || 'Comercio local',img:'',products:items,live:true,id:m.id};
+          desc:m.zona || 'Comercio local',img:m.store_image_url || '',products:items,live:true,id:m.id,isDemo:!!m.is_demo,orderable:true};
       });
       if (live.length) {
-        stores.splice(0, stores.length, ...live);
+        stores.splice(0, stores.length, ...live, ...demoStores);
         window.catalogStatus = 'live';
       } else {
-        stores.splice(0, stores.length);
+        stores.splice(0, stores.length, ...demoStores);
         window.catalogStatus = 'empty';
       }
       render();
       const note = document.getElementById('catalog-note');
       if (note) note.textContent = live.length
-        ? live.length + ' comercio(s) local(es) conectado(s) al catálogo.'
-        : 'Todavía no hay comercios publicados.';
+        ? live.length + ' comercio(s) conectado(s) + catálogo de demostración.'
+        : 'Catálogo de demostración disponible; todavía no hay comercios publicados.';
     } catch (e) {
       console.warn('No se pudo cargar el catálogo:', e.message);
       stores.splice(0, stores.length);

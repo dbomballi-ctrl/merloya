@@ -246,6 +246,7 @@ async function renderAccount(user){
     }).join('');
     document.querySelectorAll('[data-review]').forEach(btn=>btn.addEventListener('click',()=>reviewPayment(btn.dataset.payment,btn.dataset.review,btn)));
     if(profile.role==='admin')await renderAdminDeliveryAssignments();
+    if(profile.role==='admin')await renderCourierManagement();
     
   }else if(profile.role==='repartidor'){
     await renderCourierAssignments(user);
@@ -378,6 +379,31 @@ async function saveMerchantProduct(productId){
   if(result.error){if(note)note.textContent='No se pudo enviar: '+result.error.message;return}
   if(note)note.textContent='Enviado a revisión. No aparecerá en el catálogo hasta que Merlo Ya lo apruebe.';
   await renderAccount(user);
+}
+async function renderCourierManagement(){
+  const container=document.getElementById('cartLines');
+  const {data,error}=await window.merloDb.functions.invoke('manage-courier-profiles',{body:{action:'list'}});
+  if(error||!data?.success){container.innerHTML+='<section class="catalog-manager"><h3>Repartidores</h3><p class="notice">No se pudo cargar la gestión de repartidores.</p></section>';return}
+  const users=(data.profiles||[]).filter(x=>x.role==='usuario');
+  const couriers=(data.profiles||[]).filter(x=>x.role==='repartidor');
+  container.innerHTML+='<section class="catalog-manager"><h3>Gestión de repartidores</h3><p class="notice">Primero creá una cuenta normal desde “Crear cuenta de cliente”. Después podés habilitarla acá para recibir entregas.</p>'+
+    (users.length?'<label class="muted" for="courierCandidate">Cuenta de cliente</label><select id="courierCandidate" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:9px;margin:6px 0"><option value="">Seleccionar cuenta</option>'+users.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.nombre||'Cliente')+(x.is_demo?' · DEMO':'')+'</option>').join('')+'</select><button class="primary" type="button" onclick="promoteCourier()">Habilitar como repartidor</button>':'<p class="notice">No hay cuentas de cliente disponibles para habilitar.</p>')+
+    '<h4>Repartidores habilitados ('+couriers.length+')</h4>'+(couriers.map(x=>'<div class="catalog-product"><div><b>'+esc(x.nombre||'Repartidor')+'</b><div class="muted">'+(x.is_demo?'Cuenta demo':'Cuenta activa')+'</div></div><button class="pill" type="button" data-demote-courier="'+esc(x.id)+'">Deshabilitar</button></div>').join('')||'<p class="notice">Todavía no hay repartidores habilitados.</p>')+'</section>';
+  container.querySelectorAll('[data-demote-courier]').forEach(btn=>btn.addEventListener('click',()=>demoteCourier(btn.dataset.demoteCourier,btn)));
+}
+async function promoteCourier(){
+  const userId=document.getElementById('courierCandidate')?.value;
+  if(!userId){alert('Seleccioná una cuenta de cliente.');return}
+  const {data,error}=await window.merloDb.functions.invoke('manage-courier-profiles',{body:{action:'promote',user_id:userId}});
+  if(error||!data?.success){alert(data?.error||error?.message||'No se pudo habilitar el repartidor.');return}
+  const {data:{user}}=await window.merloDb.auth.getUser();await renderAccount(user);
+}
+async function demoteCourier(userId,button){
+  if(!confirm('¿Deshabilitar esta cuenta como repartidor?'))return;
+  button.disabled=true;
+  const {data,error}=await window.merloDb.functions.invoke('manage-courier-profiles',{body:{action:'demote',user_id:userId}});
+  if(error||!data?.success){alert(data?.error||error?.message||'No se pudo deshabilitar.');button.disabled=false;return}
+  const {data:{user}}=await window.merloDb.auth.getUser();await renderAccount(user);
 }
 async function renderAdminDeliveryAssignments(){
   const db=window.merloDb;

@@ -46,12 +46,12 @@ Deno.serve(async (req) => {
       const store_image_url = String(body.store_image_url ?? "").trim().slice(0, 1000);
       if (!id || !nombre || !rubro || !domicilio) return json({ error: "Nombre, rubro, dirección e identificador de cuenta son obligatorios." }, 400);
       if (store_image_url && !/^https:\/\//i.test(store_image_url)) return json({ error: "La foto debe usar HTTPS." }, 400);
-      const { data: target } = await db.from("profiles").select("id,role").eq("id", id).maybeSingle();
+      const { data: target } = await db.from("profiles").select("id,role,publication_status").eq("id", id).maybeSingle();
       if (!target || !["usuario", "comercio"].includes(target.role)) return json({ error: "La cuenta seleccionada no puede convertirse en comercio." }, 404);
       const { data, error } = await db.from("profiles").update({
         nombre, rubro, zona: zona || null, domicilio, whatsapp: whatsapp || null,
         store_image_url: store_image_url || null, role: "comercio",
-        publication_status: "approved",
+        publication_status: target.role === "comercio" ? target.publication_status : "approved",
       }).eq("id", id).select("id,nombre,role,publication_status").single();
       if (error) throw error;
       return json({ success: true, merchant: data });

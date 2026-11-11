@@ -512,7 +512,7 @@ async function renderMerchantOrders(){
   try{
     const {orders}=await merchantOrderAction({action:'list'});
     return '<section class="catalog-manager"><h3>Pedidos del comercio</h3><p class="notice">Los pedidos se habilitan para preparación cuando Merlo Ya confirma todos los pagos. En retiro, el comercio marca la entrega; en delivery, la finaliza el repartidor.</p>'+
-      (orders||[]).map(o=>'<article class="catalog-product"><div><b>Pedido '+esc(o.order_id.slice(0,8))+' · '+esc(o.orders.fulfillment_type==='pickup'?'Retiro':'Delivery')+'</b><div class="catalog-status">'+new Date(o.created_at).toLocaleString('es-AR')+' · '+merchantOrderStatusLabel(o.status)+'</div>'+
+      ((orders||[]).map(o=>'<article class="catalog-product"><div><b>Pedido '+esc(o.order_id.slice(0,8))+' · '+esc(o.orders.fulfillment_type==='pickup'?'Retiro':'Delivery')+'</b><div class="catalog-status">'+new Date(o.created_at).toLocaleString('es-AR')+' · '+merchantOrderStatusLabel(o.status)+'</div>'+
       '<div class="catalog-status">'+(o.order_items||[]).map(x=>esc(x.quantity+' × '+x.product_name_snapshot)+' ('+money(Number(x.unit_price))+')').join('<br>')+'</div><div class="catalog-status">Subtotal '+money(Number(o.subtotal))+' · Envío '+money(Number(o.shipping_fee))+'</div><div class="catalog-status">'+esc(o.delivery_address_snapshot||'')+(o.orders.customer_phone?' · '+esc(o.orders.customer_phone):'')+'</div></div>'+
       '<div class="catalog-actions">'+(o.status==='confirmed'?'<button type="button" onclick="updateMerchantOrder(\''+esc(o.id)+'\',\'preparing\')">Preparar</button>':'')+
       (o.status==='preparing'&&o.orders.fulfillment_type==='delivery'?'<button type="button" onclick="updateMerchantOrder(\''+esc(o.id)+'\',\'dispatched\')">Listo para retirar</button>':'')+
@@ -523,7 +523,7 @@ async function renderAdminOrderMonitor(){
   try{
     const {orders}=await merchantOrderAction({action:'list'});
     return '<section class="catalog-manager"><h3>Seguimiento de pedidos</h3><p class="notice">Vista general de pedidos por comercio. Los estados se actualizan en los paneles de cada comercio y repartidor.</p>'+
-      (orders||[]).map(o=>'<div class="catalog-product"><div><b>'+esc(o.merchant_name_snapshot)+' · Pedido '+esc(o.order_id.slice(0,8))+'</b><div class="catalog-status">'+new Date(o.created_at).toLocaleString('es-AR')+' · '+merchantOrderStatusLabel(o.status)+' · '+esc(o.orders.fulfillment_type==='pickup'?'Retiro':'Delivery')+'</div><div class="catalog-status">'+(o.order_items||[]).map(x=>esc(x.quantity+' × '+x.product_name_snapshot)).join('<br>')+'</div></div><b>'+money(Number(o.subtotal)+Number(o.shipping_fee))+'</b></div>').join('')||'<p class="notice">Todavía no hay pedidos.</p>')+'</section>';
+      ((orders||[]).map(o=>'<div class="catalog-product"><div><b>'+esc(o.merchant_name_snapshot)+' · Pedido '+esc(o.order_id.slice(0,8))+'</b><div class="catalog-status">'+new Date(o.created_at).toLocaleString('es-AR')+' · '+merchantOrderStatusLabel(o.status)+' · '+esc(o.orders.fulfillment_type==='pickup'?'Retiro':'Delivery')+'</div><div class="catalog-status">'+(o.order_items||[]).map(x=>esc(x.quantity+' × '+x.product_name_snapshot)).join('<br>')+'</div></div><b>'+money(Number(o.subtotal)+Number(o.shipping_fee))+'</b></div>').join('')||'<p class="notice">Todavía no hay pedidos.</p>')+'</section>';
   }catch(e){return '<section class="catalog-manager"><h3>Seguimiento de pedidos</h3><p class="notice">'+esc(e.message)+'</p></section>'}
 }
 async function updateMerchantOrder(id,status){

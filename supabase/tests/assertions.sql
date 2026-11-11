@@ -34,8 +34,11 @@ begin
   if has_table_privilege('anon','public.profiles','SELECT') then
     raise exception 'anon unexpectedly has table-wide SELECT on profiles';
   end if;
-  if has_column_privilege('anon','public.profiles','domicilio','SELECT') then
-    raise exception 'anon can read private profile address';
+  if not has_column_privilege('anon','public.profiles','domicilio','SELECT') then
+    raise exception 'anon cannot read approved merchant pickup address';
+  end if;
+  if position('domicilio' in pg_get_viewdef('public.public_merchants'::regclass,true)) = 0 then
+    raise exception 'public_merchants does not expose approved merchant pickup address';
   end if;
   if has_column_privilege('anon','public.profiles','nombre','SELECT') is not true then
     raise exception 'anon cannot read public merchant name';

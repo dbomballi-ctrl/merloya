@@ -71,6 +71,11 @@ Deno.serve(async (req) => {
         }
         throw updateError;
       }
+      if (nextStatus === "delivered") {
+        const { error: merchantOrderError } = await db.from("merchant_orders")
+          .update({ status: "delivered" }).eq("order_id", orderId).eq("status", "dispatched");
+        if (merchantOrderError) throw merchantOrderError;
+      }
       return json({ success: true, assignment: updated });
     }
 

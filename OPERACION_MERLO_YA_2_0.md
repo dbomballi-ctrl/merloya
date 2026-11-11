@@ -22,11 +22,14 @@
 ### Comercio
 - Solicitud de alta y edición de perfil con revisión de administración.
 - La dirección del local es obligatoria para aprobar el perfil y habilitar retiro gratuito.
-- Gestión de productos y moderación de publicaciones.
-- Consulta de pedidos y revisión de comprobantes destinados al propio comercio.
+- Gestión de productos propios: alta y edición; cada cambio requiere aprobación de administración.
+- Consulta de pedidos, preparación y despacho a reparto; en retiro, el comercio confirma la entrega.
+- Revisión de comprobantes destinados al propio comercio.
 
 ### Administración
 - Revisión de perfiles, comercios y productos.
+- Administración directa del catálogo: crear comercios desde cuentas existentes, editar datos de locales, crear/editar/eliminar productos y publicar o pausar comercios y productos.
+- Vista global de pedidos y estados por comercio.
 - Configuración de cuenta de cobro de Merlo Ya y tarifas de delivery.
 - Habilitación/deshabilitación de cuentas de repartidor.
 - Asignación manual de pedidos delivery confirmados.
@@ -48,7 +51,9 @@
 7. El cliente transfiere manualmente y adjunta comprobantes privados.
 8. Comercio y administración revisan los pagos según el destinatario.
 9. El pedido queda confirmado cuando todos los pagos requeridos están verificados.
-10. Para ambos modos se genera un enlace `wa.me` dirigido exclusivamente a Merlo Ya (`5491126306785`). WhatsApp abre con el texto preparado; el cliente debe tocar Enviar. No hay envío automático.
+10. Cada comercio prepara su subpedido cuando todos los pagos están verificados. Para delivery, marca el pedido listo para reparto; para pickup, confirma la entrega al cliente.
+11. Administración puede asignar un repartidor cuando todos los comercios marcaron sus subpedidos listos. El repartidor registra retiro y entrega; la entrega final actualiza los subpedidos.
+12. Para ambos modos se genera un enlace `wa.me` dirigido exclusivamente a Merlo Ya (`5491126306785`). WhatsApp abre con el texto preparado; el cliente debe tocar Enviar. No hay envío automático.
 
 ## Edge Functions desplegadas
 
@@ -59,6 +64,8 @@
 - `manage-platform-settings`
 - `manage-delivery-assignment`
 - `manage-courier-profiles`
+- `admin-catalog`
+- `manage-merchant-orders`
 - `super-service`
 
 Las funciones operativas requieren JWT y validan el rol en servidor. La clave `SUPABASE_SERVICE_ROLE_KEY` solo existe en el runtime de Edge Functions y nunca debe incluirse en el frontend.
@@ -90,8 +97,8 @@ El repositorio conserva además `202611080002_transferencias_multiproveedor.sql`
 - El rol `anon` conserva lectura solo del catálogo público; se revocó su acceso a tablas privadas de pedidos, pagos, cuentas y perfiles.
 - `public_merchants` usa `security_invoker` y solo expone comercios aprobados, incluida su dirección comercial de retiro.
 - La RPC privilegiada de checkout solo puede ejecutarse con `service_role`.
-- El chequeo de Deno y la validación de sintaxis JavaScript/IDs HTML pasaron en GitHub Actions.
-- La prueba local de migraciones detectó inicialmente que Supabase CLI aplicaba migraciones antes del fixture; se corrigió el workflow para iniciar el stack vacío, cargar el fixture y luego aplicar las migraciones. La nueva ejecución está pendiente de resultado.
+- El chequeo Deno de todas las Edge Functions y la validación de sintaxis JavaScript/IDs HTML pasaron en GitHub Actions.
+- La prueba local de migraciones aplicó el fixture, ejecutó todas las migraciones en orden y validó los invariantes de esquema y seguridad: resultado exitoso en el último commit verificado.
 
 ## Configuración necesaria antes de abrir al público
 

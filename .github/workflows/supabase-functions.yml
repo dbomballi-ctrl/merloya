@@ -40,7 +40,7 @@ jobs:
           import subprocess
 
           html = Path("index.html").read_text(encoding="utf-8")
-          scripts = re.findall(r'<script\\b(?![^>]*\\bsrc\\s*=)[^>]*>(.*?)</script\\s*>', html, re.I | re.S)
+          scripts = re.findall(r'<script\b(?![^>]*\bsrc\s*=)[^>]*>(.*?)</script\s*>', html, re.I | re.S)
           if not scripts:
               raise SystemExit("No inline JavaScript found in index.html")
           for index, source in enumerate(scripts):

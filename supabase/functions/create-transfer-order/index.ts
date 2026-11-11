@@ -217,6 +217,11 @@ Deno.serve(async (req) => {
     }
     const orderId = created.order_id;
     const replayed = created.replayed === true;
+    if (demoMode) {
+      const { error: demoStatusError } = await db.from("merchant_orders")
+        .update({ status: "confirmed" }).eq("order_id", orderId).eq("status", "awaiting_transfers");
+      if (demoStatusError) throw demoStatusError;
+    }
     const { data: payments, error: paymentError } = await db.from("transfer_payments")
       .select("id,merchant_order_id,payee_type,merchant_id,amount,destination_snapshot,status")
       .eq("order_id", orderId).order("created_at", { ascending: true });

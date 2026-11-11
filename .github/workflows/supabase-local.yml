@@ -1,0 +1,65 @@
+name: Supabase local migration tests
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "supabase/migrations/**"
+      - "supabase/tests/**"
+      - ".github/workflows/supabase-local.yml"
+  push:
+    branches: [merlo-ya-2.0-frontend-rebuild]
+    paths:
+      - "supabase/migrations/**"
+      - "supabase/tests/**"
+      - ".github/workflows/supabase-local.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  migration-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start isolated Supabase stack
+        run: |
+          set -euo pipefail
+          # Prevent the CLI from applying project migrations before the legacy fixture exists.
+          mv supabase/migrations /tmp/merlo-migrations
+          mkdir -p supabase/migrations
+          supabase start -x studio,edge-runtime,logflare,vector,imgproxy,inbucket
+          rmdir supabase/migrations
+          mv /tmp/merlo-migrations supabase/migrations
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+
+      - name: Bootstrap legacy schema fixture
+        run: |
+          PGPASSWORD=postgres psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
+            -v ON_ERROR_STOP=1 -f supabase/tests/fixtures/legacy_schema.sql
+
+      - name: Apply all migrations in order
+        run: |
+          set -euo pipefail
+          for migration in supabase/migrations/*.sql; do
+            echo "::group::Applying ${migration}"
+            PGPASSWORD=postgres psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
+              -v ON_ERROR_STOP=1 -f "${migration}"
+            echo "::endgroup::"
+          done
+
+      - name: Assert schema and security invariants
+        run: |
+          PGPASSWORD=postgres psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
+            -v ON_ERROR_STOP=1 -f supabase/tests/assertions.sql

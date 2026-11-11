@@ -1,0 +1,430 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#16834b"><title>Merlo Ya 2.0 — Todo lo que necesitás, cerca tuyo</title>
+<style>
+:root{--green:#16834b;--green2:#0d6538;--mint:#e9f7ee;--ink:#172b22;--muted:#718078;--line:#e7eee9;--bg:#f7faf8;--orange:#ff9b39;--shadow:0 12px 32px #183b2810}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px Inter,system-ui,-apple-system,Segoe UI,sans-serif}button,input{font:inherit}button{cursor:pointer}.wrap{max-width:1180px;margin:auto;padding:0 22px}
+header{background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}.head{height:76px;display:flex;align-items:center;justify-content:space-between;gap:16px}.brand{display:flex;align-items:center;gap:10px;color:var(--ink);text-decoration:none;font-weight:900;font-size:22px;letter-spacing:-.7px}.mark{width:40px;height:40px;border-radius:14px;background:var(--green);display:grid;place-items:center;color:white;font-size:23px}.brand small{display:block;color:var(--muted);font-size:10px;font-weight:600;letter-spacing:0}.actions{display:flex;align-items:center;gap:9px}.pill{border:1px solid var(--line);background:white;border-radius:999px;padding:10px 14px;color:var(--ink);font-weight:700}.cart{background:var(--green);color:#fff;border:0}.hero{margin:24px auto 26px;border-radius:25px;overflow:hidden;min-height:230px;background:linear-gradient(90deg,#0b3f2be8,#0b3f2b88),url('merlo_ya_assets/sierras-banner.jpg') center/cover;display:flex;align-items:center;padding:34px 42px;color:white}.hero h1{font-size:clamp(30px,5vw,48px);line-height:1.04;max-width:570px;margin:10px 0}.hero p{color:#e0f4e7;margin:0}.eyebrow{font-size:11px;text-transform:uppercase;letter-spacing:2px;font-weight:900;color:#bce8cb}.search{margin:0 0 22px;display:flex;gap:10px}.search input{flex:1;min-width:0;border:1px solid var(--line);border-radius:15px;padding:15px 18px;background:white;outline-color:var(--green);box-shadow:var(--shadow)}.section-head{display:flex;align-items:end;justify-content:space-between;margin:26px 0 14px}.section-head h2{margin:0;font-size:21px;letter-spacing:-.5px}.section-head p{margin:4px 0 0;color:var(--muted);font-size:13px}.chips{display:flex;gap:8px;overflow:auto;padding:2px 0 6px}.chip{white-space:nowrap;border:1px solid var(--line);border-radius:999px;padding:9px 15px;background:white;color:#405448;font-weight:700}.chip.active{background:var(--green);border-color:var(--green);color:white}.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}.store{background:white;border:1px solid var(--line);border-radius:18px;overflow:hidden;box-shadow:var(--shadow)}.store img{width:100%;height:155px;object-fit:cover;display:block}.store-body{padding:14px}.store h3{margin:0 0 5px;font-size:16px}.muted{color:var(--muted);font-size:12px}.tag{display:inline-block;margin-top:10px;background:var(--mint);color:var(--green2);border-radius:99px;padding:5px 9px;font-size:11px;font-weight:800}.store button{margin-top:12px;width:100%;border:0;background:#f0f7f2;color:var(--green2);border-radius:10px;padding:10px;font-weight:800}.delivery{margin:28px 0;background:#eaf6ee;border:1px solid #d9ecdf;border-radius:18px;padding:18px;display:flex;gap:14px;align-items:center}.delivery-icon{width:48px;height:48px;border-radius:15px;background:white;display:grid;place-items:center;font-size:24px}.delivery strong{display:block}.delivery p{margin:3px 0 0;color:#597263;font-size:13px}.footer{padding:28px 0 40px;color:var(--muted);font-size:12px}.overlay{position:fixed;inset:0;background:#10251bb0;display:none;z-index:10;justify-content:flex-end}.overlay.open{display:flex}.drawer{background:white;width:min(440px,100%);height:100%;padding:22px;overflow:auto}.drawer-head{display:flex;justify-content:space-between;align-items:center}.drawer-head h2{margin:0}.x{border:0;background:#f1f5f2;border-radius:50%;width:36px;height:36px;font-size:20px}.cart-line{display:flex;justify-content:space-between;gap:10px;border-bottom:1px solid var(--line);padding:13px 0}.qty{display:flex;align-items:center;gap:8px}.qty button{border:1px solid var(--line);background:white;border-radius:8px;width:27px;height:27px}.total{display:flex;justify-content:space-between;font-weight:900;font-size:18px;padding:18px 0}.primary{background:var(--green);border:0;color:white;border-radius:12px;padding:13px 16px;font-weight:850;width:100%}.empty{text-align:center;color:var(--muted);padding:55px 10px}.product-row{display:flex;justify-content:space-between;align-items:center;gap:12px;border-bottom:1px solid var(--line);padding:13px 0}.product-row:last-child{border:0}.product-info{min-width:0}.product-info b{display:block}.product-add{border:0;background:var(--mint);color:var(--green2);border-radius:9px;padding:9px 12px;font-weight:850;white-space:nowrap}.product-empty{padding:25px 8px;text-align:center;color:var(--muted)}.notice{font-size:12px;color:var(--muted);line-height:1.5;margin-top:12px}
+@media(max-width:800px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.hero{min-height:205px;padding:26px}.head{height:66px}.brand small{display:none}}
+@media(max-width:540px){.wrap{padding:0 15px}.head{gap:8px}.brand{font-size:19px}.mark{width:36px;height:36px}.actions .pill.login{display:none}.hero{margin:15px auto 20px;border-radius:18px;min-height:205px;padding:22px}.grid{grid-template-columns:1fr 1fr;gap:10px}.store img{height:115px}.store-body{padding:10px}.store h3{font-size:14px}.store button{font-size:12px;padding:9px}.section-head h2{font-size:19px}}
+</style></head>
+<body>
+<header><div class="wrap head"><a class="brand" href="#"><span class="mark">⌂</span><span>Merlo Ya<small>Todo lo que necesitás, cerca tuyo.</small></span></a><div class="actions"><button class="pill login" onclick="showAccount()">Ingresar</button><button class="pill cart" onclick="openCart()">🛒 <span id="cartCount">0</span></button></div></div></header>
+<main class="wrap">
+<section class="hero"><div><div class="eyebrow">Comprá local · Recibí en casa</div><h1>Lo mejor de Merlo, a un toque.</h1><p>Descubrí comercios y productos cerca tuyo.</p></div></section>
+<div class="search"><input id="search" placeholder="¿Qué estás buscando hoy?" oninput="render()"></div>
+<div class="section-head"><div><h2>Explorá por categoría</h2><p>Encontrá eso que necesitás</p></div></div>
+<div class="chips" id="chips"></div>
+<div class="section-head"><div><h2>Comercios para descubrir</h2><p>Elegí un local y mirá lo que tiene para ofrecerte</p></div><span class="muted" id="count"></span></div>
+<div class="grid" id="stores"></div><p class="muted" id="catalog-note">Conectando catálogo…</p>
+<section class="delivery"><div class="delivery-icon">🛵</div><div><strong>Tu pedido llega con Merlo Ya</strong><p>El delivery lo coordinamos nosotros. También podés elegir retirar directamente en el comercio.</p></div></section>
+<div class="footer">Merlo Ya · Comprá cerca, apoyá lo local.</div>
+</main>
+<div class="overlay" id="overlay" onclick="if(event.target===this)closeCart()"><aside class="drawer"><div class="drawer-head"><h2>Tu carrito</h2><button class="x" onclick="closeCart()">×</button></div><div id="cartLines"></div><div id="cartBottom"></div></aside></div>
+<script>
+const categories=['Todos','Almacenes','Comida','Farmacias','Indumentaria','Servicios'];
+const stores=[
+{name:'Almacén de barrio',cat:'Almacenes',desc:'Todo para tu día a día',img:'merlo_ya_assets/almacen.jpg',products:[['Yerba mate 1 kg',4500],['Azúcar 1 kg',1500],['Aceite 900 ml',2800]]},
+{name:'Sabores de Merlo',cat:'Comida',desc:'Comidas ricas y caseras',img:'merlo_ya_assets/comida-regional.jpg',products:[['Empanadas x 6',8500],['Milanesa con guarnición',9200],['Pastas caseras',7000]]},
+{name:'Farmacia',cat:'Farmacias',desc:'Cuidado y bienestar',img:'merlo_ya_assets/farmacia.jpg',products:[['Producto de cuidado personal',3500],['Alcohol en gel',1800]]},
+{name:'La Burger',cat:'Comida',desc:'Hamburguesas y mucho más',img:'merlo_ya_assets/burger-clasica.jpg',products:[['Hamburguesa clásica',7800],['Burger bacon',9200],['Papas fritas',3500]]},
+{name:'Verdulería',cat:'Almacenes',desc:'Frutas y verduras frescas',img:'merlo_ya_assets/verduleria.jpg',products:[['Bolsa de papa 2 kg',2500],['Tomate 1 kg',2200],['Frutas de estación',3000]]},
+{name:'Ferretería',cat:'Servicios',desc:'Soluciones para tu casa',img:'merlo_ya_assets/ferreteria.jpg',products:[['Kit herramientas básico',12000],['Cinta aisladora',1200]]}
+];
+let active='Todos',cart=[];
+const money=n=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(n);
+function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function render(){
+  const categoryList=['Todos',...new Set([...categories.slice(1),...stores.map(s=>s.cat).filter(Boolean)])];
+  document.getElementById('chips').innerHTML=categoryList.map(c=>'<button class="chip '+(c===active?'active':'')+'" data-category="'+esc(c)+'">'+esc(c)+'</button>').join('');
+  document.querySelectorAll('[data-category]').forEach(btn=>btn.addEventListener('click',()=>{active=btn.dataset.category;render()}));
+  const q=document.getElementById('search').value.trim().toLowerCase();
+  const list=stores.filter(s=>(active==='Todos'||s.cat===active)&&(s.name+' '+s.desc+' '+s.products.map(p=>p[0]).join(' ')).toLowerCase().includes(q));
+  document.getElementById('count').textContent=list.length+' comercios';
+  document.getElementById('stores').innerHTML=list.map(s=>'<article class="store">'+(s.img?'<img src="'+esc(s.img)+'" alt="'+esc(s.name)+'" loading="lazy">':'')+'<div class="store-body"><h3>'+esc(s.name)+'</h3><div class="muted">'+esc(s.desc)+'</div><span class="tag">'+esc(s.cat)+'</span><button type="button" data-store="'+esc(s.name)+'">Ver '+s.products.length+' productos</button></div></article>').join('')||'<p class="muted">No encontramos comercios con esa búsqueda.</p>';
+  document.querySelectorAll('[data-store]').forEach(btn=>btn.addEventListener('click',()=>showProducts(btn.dataset.store)));
+}
+function showProducts(name){
+  const s=stores.find(x=>x.name===name);if(!s)return;
+  document.getElementById('cartLines').innerHTML='<h3>'+esc(s.name)+'</h3>'+(s.products.length?s.products.map((p,i)=>'<div class="product-row"><div class="product-info"><b>'+esc(p[0])+'</b><div class="muted">'+money(Number(p[1])||0)+'</div></div><button class="product-add" type="button" data-add="'+i+'">Agregar</button></div>').join(''):'<div class="product-empty">Este comercio todavía no tiene productos publicados.</div>');
+  document.querySelectorAll('[data-add]').forEach(btn=>btn.addEventListener('click',()=>add(name,Number(btn.dataset.add))));
+  document.getElementById('cartBottom').innerHTML='<p class="notice">Podés combinar productos de distintos comercios en un mismo carrito.</p><button class="primary" onclick="openCart()">Ver carrito ('+cart.reduce((a,x)=>a+x.qty,0)+')</button>';
+  document.getElementById('overlay').classList.add('open');
+}
+function add(name,i){
+  const s=stores.find(x=>x.name===name),p=s?.products[i];if(!p)return;
+  const key=name+'|'+p[0],item=cart.find(x=>x.key===key);
+  if(item)item.qty++;else cart.push({key,store:name,name:p[0],price:Number(p[1])||0,productId:p[2]||null,qty:1});
+  updateCart();showProducts(name);
+}
+function updateCart(){
+  document.getElementById('cartCount').textContent=cart.reduce((a,x)=>a+x.qty,0);
+  if(!cart.length){document.getElementById('cartLines').innerHTML='<div class="empty">🛍️<h3>Tu carrito está vacío</h3><p>Sumá productos de tus comercios favoritos.</p></div>';document.getElementById('cartBottom').innerHTML='';return}
+  document.getElementById('cartLines').innerHTML=cart.map((x,i)=>'<div class="cart-line"><div><b>'+esc(x.name)+'</b><div class="muted">'+esc(x.store)+' · '+money(x.price)+'</div></div><div class="qty"><button type="button" onclick="changeQty('+i+',-1)">−</button>'+x.qty+'<button type="button" onclick="changeQty('+i+',1)">+</button></div></div>').join('');
+  const total=cart.reduce((a,x)=>a+x.price*x.qty,0);
+  document.getElementById('cartBottom').innerHTML='<div class="total"><span>Subtotal</span><span>'+money(total)+'</span></div><button class="primary" type="button" onclick="showCheckout()">Continuar al checkout</button><p class="notice">Los productos de muestra no se pueden comprar. Se requiere una cuenta de cliente y ubicación de entrega.</p><p class="notice">Vista previa: no se realizan compras ni pagos reales.</p>';
+}
+let checkoutBusy=false,deliveryCoords=null,checkoutIdempotencyKey=sessionStorage.getItem('merloYaCheckoutKey')||null;
+function showCheckout(){
+  if(!cart.length)return;
+  if(cart.some(x=>!x.productId)){alert('El carrito contiene productos de muestra. Elegí productos publicados por comercios reales para continuar.');return}
+  document.getElementById('cartLines').innerHTML='<h3>Datos para el pedido</h3><label class="muted">Email de tu cuenta</label><input id="coEmail" type="email" autocomplete="username" placeholder="tu@email.com" style="width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;margin:5px 0 12px"><label class="muted">Contraseña</label><input id="coPassword" type="password" autocomplete="current-password" placeholder="Contraseña" style="width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;margin:5px 0 12px"><label class="muted">Dirección de entrega</label><input id="coAddress" placeholder="Calle y número" style="width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;margin:5px 0 12px"><label class="muted">Barrio / zona (opcional)</label><input id="coZone" placeholder="Barrio" style="width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;margin:5px 0 12px"><label class="muted">Teléfono</label><input id="coPhone" type="tel" placeholder="Código de área y número" style="width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;margin:5px 0 12px"><button class="pill" type="button" onclick="captureDeliveryLocation()">Usar mi ubicación actual</button><p id="coLocation" class="notice">La ubicación se solicita solo cuando tocás el botón.</p><p id="coError" class="notice" role="status"></p>';
+  document.getElementById('cartBottom').innerHTML='<button id="coSubmit" class="primary" type="button" onclick="submitCheckout()">Crear pedido</button><button class="pill" style="width:100%;margin-top:8px" type="button" onclick="updateCart()">Volver al carrito</button><p class="notice">Se generan instrucciones de transferencia. No se debita dinero automáticamente.</p>';
+}
+function captureDeliveryLocation(){
+  const note=document.getElementById('coLocation');
+  if(!navigator.geolocation){note.textContent='Este navegador no permite obtener ubicación.';return}
+  note.textContent='Solicitando permiso de ubicación…';
+  navigator.geolocation.getCurrentPosition(pos=>{deliveryCoords={lat:pos.coords.latitude,lon:pos.coords.longitude};note.textContent='Ubicación obtenida correctamente.'},err=>{note.textContent=err.code===1?'Permiso de ubicación denegado.':'No se pudo obtener la ubicación. Revisá GPS y permisos.'},{enableHighAccuracy:true,timeout:15000,maximumAge:60000});
+}
+async function showAccount(){
+  const db=window.merloDb;
+  if(!db){alert('No se pudo conectar con el servicio.');return}
+  document.getElementById('cartLines').innerHTML='<h3>Mi cuenta</h3><p class="notice">Ingresá para consultar tus pedidos o administrar transferencias.</p>'+
+    '<label class="muted">Email</label><input id="accountEmail" type="email" autocomplete="username" style="width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;margin:5px 0 12px">'+
+    '<label class="muted">Contraseña</label><input id="accountPassword" type="password" autocomplete="current-password" style="width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;margin:5px 0 12px">'+
+    '<p id="accountError" class="notice" role="status"></p>';
+  document.getElementById('cartBottom').innerHTML='<button class="primary" type="button" onclick="accountLogin()">Ingresar</button>';
+  document.getElementById('overlay').classList.add('open');
+  const {data:{session}}=await db.auth.getSession();
+  if(session)await renderAccount(session.user);
+}
+async function accountLogin(){
+  const db=window.merloDb,email=document.getElementById('accountEmail')?.value.trim(),password=document.getElementById('accountPassword')?.value;
+  const note=document.getElementById('accountError');
+  if(!email||!password){note.textContent='Ingresá email y contraseña.';return}
+  const {data,error}=await db.auth.signInWithPassword({email,password});
+  if(error){note.textContent=error.message;return}
+  await renderAccount(data.user);
+}
+async function renderAccount(user){
+  const db=window.merloDb;
+  document.getElementById('cartLines').innerHTML='<h3>Mi cuenta</h3><p class="notice">Cargando información…</p>';
+  document.getElementById('cartBottom').innerHTML='<button class="pill" style="width:100%" onclick="accountLogout()">Cerrar sesión</button>';
+  const {data:profile,error:profileError}=await db.from('profiles').select('id,nombre,role').eq('id',user.id).single();
+  if(profileError||!profile){document.getElementById('cartLines').innerHTML='<p class="notice">La cuenta no tiene un perfil asociado. Contactá al administrador.</p>';return}
+  if(profile.role==='usuario'){
+    const {data:orders,error}=await db.from('orders').select('id,status,subtotal,shipping_total,total_amount,created_at,delivery_address').eq('customer_id',user.id).order('created_at',{ascending:false}).limit(25);
+    if(error)throw error;
+    if(!orders?.length){document.getElementById('cartLines').innerHTML='<h3>Mis pedidos</h3><p class="notice">Todavía no tenés pedidos.</p>';return}
+    const ids=orders.map(o=>o.id);
+    const [{data:payments,error:paymentError},{data:assignments,error:assignmentError}]=await Promise.all([
+      db.from('transfer_payments').select('id,order_id,payee_type,amount,destination_snapshot,status').in('order_id',ids).order('created_at',{ascending:true}),
+      db.from('delivery_assignments').select('order_id,status').in('order_id',ids)
+    ]);
+    if(paymentError)throw paymentError;if(assignmentError)throw assignmentError;
+    const assignmentMap=new Map((assignments||[]).map(a=>[a.order_id,a.status]));
+    const statusLabel={awaiting_transfers:'Esperando transferencias',payment_review:'Pago observado',confirmed:'Pago confirmado',cancelled:'Cancelado',proof_submitted:'Comprobante enviado',verified:'Transferencia verificada',rejected:'Comprobante rechazado'};
+    document.getElementById('cartLines').innerHTML='<h3>Mis pedidos</h3>'+orders.map(o=>'<section style="border:1px solid var(--line);border-radius:12px;padding:12px;margin:12px 0"><b>Pedido '+esc(o.id.slice(0,8))+'</b><p class="muted">'+new Date(o.created_at).toLocaleString('es-AR')+' · '+esc(statusLabel[o.status]||o.status)+'</p><p class="muted">'+esc(o.delivery_address)+'</p>'+(assignmentMap.has(o.id)?'<p class="notice">Delivery: '+esc({assigned:'Repartidor asignado',picked_up:'Pedido retirado',delivered:'Pedido entregado'}[assignmentMap.get(o.id)]||assignmentMap.get(o.id))+'</p>':'')+'<div class="total"><span>Total</span><span>'+money(Number(o.total_amount))+'</span></div>'+
+      (payments||[]).filter(x=>x.order_id===o.id).map(x=>'<div class="cart-line" style="display:block"><b>'+(x.payee_type==='merchant'?'Comercio':'Envío · Merlo Ya')+' · '+money(Number(x.amount))+'</b><p class="muted">'+esc(statusLabel[x.status]||x.status)+'</p><p class="muted">'+esc(x.destination_snapshot?.bank_name||'')+' · '+esc(x.destination_snapshot?.account_holder||'')+'<br>CBU: '+esc(x.destination_snapshot?.cbu||'—')+'<br>Alias: '+esc(x.destination_snapshot?.alias||'—')+'</p>'+
+      (['awaiting_transfer','rejected'].includes(x.status)?'<label class="muted" for="proof-'+esc(x.id)+'">Adjuntar comprobante (JPG, PNG o PDF; máximo 5 MB)</label><input id="proof-'+esc(x.id)+'" type="file" accept="image/jpeg,image/png,application/pdf" style="width:100%;margin:7px 0"><button class="pill" data-proof="'+esc(x.id)+'" type="button">Subir comprobante</button><span id="proof-status-'+esc(x.id)+'" class="notice"></span>':'')+'</div>').join('')+'</section>').join('');
+    document.querySelectorAll('[data-proof]').forEach(btn=>btn.addEventListener('click',()=>uploadPaymentProof(btn.dataset.proof,btn)));
+  }else if(profile.role==='comercio'||profile.role==='admin'){
+    let merchantSettings='';
+    if(profile.role==='admin'){
+      const [{data:platform},{data:rates}]=await Promise.all([
+        db.from('platform_settings').select('account_holder,bank_name,cbu,alias').eq('id',true).maybeSingle(),
+        db.from('delivery_rate_tiers').select('id,label,min_km,max_km,fee,active').order('sort_order')
+      ]);
+      merchantSettings='<section style="border:1px solid var(--line);border-radius:12px;padding:12px;margin:12px 0"><h3>Cuenta de Merlo Ya</h3>'+
+        '<label class="muted">Titular</label><input id="platformHolder" value="'+esc(platform?.account_holder||'')+'" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:9px;margin:5px 0 10px">'+
+        '<label class="muted">Banco o billetera</label><input id="platformBank" value="'+esc(platform?.bank_name||'')+'" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:9px;margin:5px 0 10px">'+
+        '<label class="muted">Alias</label><input id="platformAlias" value="'+esc(platform?.alias||'')+'" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:9px;margin:5px 0 10px">'+
+        '<label class="muted">CBU</label><input id="platformCbu" value="'+esc(platform?.cbu||'')+'" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:9px;margin:5px 0 10px">'+
+        '<button class="primary" type="button" onclick="savePlatformAccount()">Guardar cuenta de Merlo Ya</button></section>'+
+        '<section style="border:1px solid var(--line);border-radius:12px;padding:12px;margin:12px 0"><h3>Tarifas de delivery</h3><div id="deliveryRates">'+(rates||[]).filter(x=>x.active).map(x=>'<div data-rate-row data-rate-id="'+esc(x.id)+'" style="border-bottom:1px solid var(--line);padding:10px 0"><label class="muted">Nombre del tramo</label><input data-rate-label value="'+esc(x.label)+'" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:8px;margin:4px 0"><div style="display:flex;gap:7px"><input data-rate-min type="number" min="0" step="0.01" value="'+esc(x.min_km)+'" placeholder="Desde km" style="width:33%;padding:9px;border:1px solid var(--line);border-radius:8px"><input data-rate-max type="number" min="0" step="0.01" value="'+esc(x.max_km??'')+'" placeholder="Hasta km (vacío = sin límite)" style="width:33%;padding:9px;border:1px solid var(--line);border-radius:8px"><input data-rate-fee type="number" min="0" step="0.01" value="'+esc(x.fee)+'" placeholder="Importe ARS" style="width:34%;padding:9px;border:1px solid var(--line);border-radius:8px"></div><button class="pill" type="button" onclick="this.closest(\'[data-rate-row]\').remove()">Quitar tramo</button></div>').join('')+'</div>'+
+        '<button class="pill" type="button" onclick="addDeliveryRateRow()">Agregar tramo</button><button class="primary" style="margin-top:8px" type="button" onclick="saveDeliveryRates()">Guardar tarifas</button><p id="adminSettingsNote" class="notice">Los importes se expresan en ARS. Los tramos no pueden superponerse.</p></section>';
+    }
+    if(profile.role==='comercio'){
+      const [{data:account},{data:location}]=await Promise.all([
+        db.from('merchant_payment_accounts').select('account_holder,bank_name,cbu,alias').eq('merchant_id',user.id).maybeSingle(),
+        db.from('profiles').select('latitude,longitude').eq('id',user.id).single()
+      ]);
+      merchantSettings='<section style="border:1px solid var(--line);border-radius:12px;padding:12px;margin:12px 0"><h3>Cuenta y ubicación del comercio</h3>'+
+        '<label class="muted">Titular de la cuenta</label><input id="merchantHolder" maxlength="120" value="'+esc(account?.account_holder||'')+'" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:9px;margin:5px 0 10px">'+
+        '<label class="muted">Banco o billetera</label><input id="merchantBank" maxlength="120" value="'+esc(account?.bank_name||'')+'" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:9px;margin:5px 0 10px">'+
+        '<label class="muted">Alias</label><input id="merchantAlias" maxlength="80" value="'+esc(account?.alias||'')+'" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:9px;margin:5px 0 10px">'+
+        '<label class="muted">CBU</label><input id="merchantCbu" maxlength="30" value="'+esc(account?.cbu||'')+'" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:9px;margin:5px 0 10px">'+
+        '<label class="muted">Latitud</label><input id="merchantLat" type="number" step="any" value="'+esc(location?.latitude??'')+'" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:9px;margin:5px 0 10px">'+
+        '<label class="muted">Longitud</label><input id="merchantLon" type="number" step="any" value="'+esc(location?.longitude??'')+'" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:9px;margin:5px 0 10px">'+
+        '<button class="pill" type="button" onclick="captureMerchantLocation()">Usar ubicación actual</button><button class="primary" style="margin-top:8px" type="button" onclick="saveMerchantSettings()">Guardar datos</button><p id="merchantSettingsNote" class="notice">El alias o CBU y la ubicación son necesarios para recibir pedidos.</p></section>';
+    }
+    let query=db.from('transfer_payments').select('id,order_id,merchant_id,payee_type,amount,status,created_at').eq('status','proof_submitted').order('created_at',{ascending:false}).limit(50);
+    if(profile.role==='comercio')query=query.eq('merchant_id',user.id).eq('payee_type','merchant');
+    const {data:payments,error}=await query;
+    if(error)throw error;
+    if(!payments?.length){
+      document.getElementById('cartLines').innerHTML=merchantSettings+'<h3>Transferencias para revisar</h3><p class="notice">No hay comprobantes pendientes de revisión.</p>';
+      if(profile.role==='admin')await renderAdminDeliveryAssignments();
+      return
+    }
+    const ids=payments.map(x=>x.id);
+    const {data:proofs,error:proofError}=await db.from('payment_proofs').select('payment_id,storage_path,uploaded_at').in('payment_id',ids).order('uploaded_at',{ascending:false});
+    if(proofError)throw proofError;
+    const proofLinks=await Promise.all((proofs||[]).map(async proof=>{
+      const {data}=await db.storage.from('payment-proofs').createSignedUrl(proof.storage_path,300);
+      return {payment_id:proof.payment_id,url:data?.signedUrl};
+    }));
+    document.getElementById('cartLines').innerHTML=merchantSettings+'<h3>Transferencias para revisar</h3>'+payments.map(x=>{
+      const proof=proofLinks.find(y=>y.payment_id===x.id);
+      return '<section style="border:1px solid var(--line);border-radius:12px;padding:12px;margin:12px 0"><b>Pedido '+esc(x.order_id.slice(0,8))+'</b><p class="muted">'+(x.payee_type==='merchant'?'Pago al comercio':'Pago de envío')+' · '+money(Number(x.amount))+'</p>'+
+        (proof?.url?'<a href="'+esc(proof.url)+'" target="_blank" rel="noopener">Ver comprobante privado</a>':'<p class="notice">No se encontró el archivo del comprobante.</p>')+
+        '<label class="muted" for="review-note-'+esc(x.id)+'">Observación (opcional)</label><input id="review-note-'+esc(x.id)+'" maxlength="500" placeholder="Motivo si se rechaza" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:9px;margin:6px 0">'+
+        '<div style="display:flex;gap:8px"><button class="primary" style="width:50%" data-review="verified" data-payment="'+esc(x.id)+'">Verificar</button><button class="pill" style="width:50%" data-review="rejected" data-payment="'+esc(x.id)+'">Rechazar</button></div></section>';
+    }).join('');
+    document.querySelectorAll('[data-review]').forEach(btn=>btn.addEventListener('click',()=>reviewPayment(btn.dataset.payment,btn.dataset.review,btn)));
+    if(profile.role==='admin')await renderAdminDeliveryAssignments();
+  }else if(profile.role==='repartidor'){
+    await renderCourierAssignments(user);
+  }else{
+    document.getElementById('cartLines').innerHTML='<p class="notice">Este perfil no tiene acceso a un panel operativo.</p>';
+  }
+}
+async function renderAdminDeliveryAssignments(){
+  const db=window.merloDb;
+  const {data:orders,error:orderError}=await db.from('orders').select('id,created_at,total_amount').eq('status','confirmed').order('created_at',{ascending:false}).limit(30);
+  if(orderError)throw orderError;
+  const container=document.getElementById('cartLines');
+  if(!orders?.length){container.innerHTML+='<section style="border:1px solid var(--line);border-radius:12px;padding:12px;margin:12px 0"><h3>Asignación de repartidores</h3><p class="notice">No hay pedidos con pagos confirmados para asignar.</p></section>';return}
+  const ids=orders.map(o=>o.id);
+  const [{data:assignments,error:assignmentError},{data:couriers,error:courierError}]=await Promise.all([
+    db.from('delivery_assignments').select('order_id,courier_id,status').in('order_id',ids),
+    db.from('profiles').select('id,nombre').eq('role','repartidor')
+  ]);
+  if(assignmentError)throw assignmentError;if(courierError)throw courierError;
+  const assigned=new Map((assignments||[]).map(x=>[x.order_id,x]));
+  const courierOptions=(couriers||[]).map(c=>'<option value="'+esc(c.id)+'">'+esc(c.nombre||'Repartidor')+'</option>').join('');
+  container.innerHTML+='<section style="border:1px solid var(--line);border-radius:12px;padding:12px;margin:12px 0"><h3>Asignación de repartidores</h3>'+
+    ((couriers||[]).length?orders.map(o=>{
+      const a=assigned.get(o.id),finished=['picked_up','delivered'].includes(a?.status);
+      return '<div style="border-bottom:1px solid var(--line);padding:10px 0"><b>Pedido '+esc(o.id.slice(0,8))+' · '+money(Number(o.total_amount))+'</b><p class="muted">'+new Date(o.created_at).toLocaleString('es-AR')+' · '+esc(a?.status||'Sin asignar')+'</p>'+
+        '<select id="courier-'+esc(o.id)+'" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:9px;margin:5px 0" '+(finished?'disabled':'')+'><option value="">Seleccionar repartidor</option>'+courierOptions+'</select>'+
+        '<button class="pill" data-assign-order="'+esc(o.id)+'" type="button" '+(finished?'disabled':'')+'>'+(a?'Reasignar':'Asignar')+'</button></div>';
+    }).join(''):'<p class="notice">No hay perfiles con rol repartidor. Administración debe habilitar el rol en un perfil antes de asignar pedidos.</p>')+'</section>';
+  container.querySelectorAll('[data-assign-order]').forEach(btn=>{
+    const a=assigned.get(btn.dataset.assignOrder);if(a)document.getElementById('courier-'+btn.dataset.assignOrder).value=a.courier_id;
+    btn.addEventListener('click',()=>assignCourier(btn.dataset.assignOrder,btn));
+  });
+}
+async function assignCourier(orderId,button){
+  const courierId=document.getElementById('courier-'+orderId)?.value;
+  if(!courierId){alert('Seleccioná un repartidor.');return}
+  button.disabled=true;button.textContent='Asignando…';
+  const {data,error}=await window.merloDb.functions.invoke('manage-delivery-assignment',{body:{action:'assign',order_id:orderId,courier_id:courierId}});
+  if(error||!data?.success){alert(data?.error||error?.message||'No se pudo asignar.');button.disabled=false;button.textContent='Reintentar';return}
+  const {data:{user}}=await window.merloDb.auth.getUser();await renderAccount(user);
+}
+async function renderCourierAssignments(user){
+  const db=window.merloDb;
+  const {data:assignments,error}=await db.from('delivery_assignments').select('id,order_id,status,assigned_at').eq('courier_id',user.id).order('assigned_at',{ascending:false}).limit(50);
+  if(error)throw error;
+  if(!assignments?.length){document.getElementById('cartLines').innerHTML='<h3>Mis entregas</h3><p class="notice">No tenés entregas asignadas.</p>';return}
+  const {data:orders,error:orderError}=await db.from('orders').select('id,delivery_address,delivery_zone,customer_phone,total_amount').in('id',assignments.map(a=>a.order_id));
+  if(orderError)throw orderError;
+  const orderMap=new Map((orders||[]).map(o=>[o.id,o]));
+  const labels={assigned:'Asignado',picked_up:'Retirado del comercio',delivered:'Entregado',cancelled:'Cancelado'};
+  document.getElementById('cartLines').innerHTML='<h3>Mis entregas</h3>'+assignments.map(a=>{
+    const o=orderMap.get(a.order_id);
+    return '<section style="border:1px solid var(--line);border-radius:12px;padding:12px;margin:12px 0"><b>Pedido '+esc(a.order_id.slice(0,8))+'</b><p class="muted">'+esc(labels[a.status]||a.status)+'</p>'+
+      '<p>'+esc(o?.delivery_address||'')+' · '+esc(o?.delivery_zone||'')+'</p><p class="muted">Teléfono: '+esc(o?.customer_phone||'No informado')+'</p>'+
+      (a.status==='assigned'?'<button class="primary" data-delivery-status="picked_up" data-order="'+esc(a.order_id)+'">Marcar retirado del comercio</button>':a.status==='picked_up'?'<button class="primary" data-delivery-status="delivered" data-order="'+esc(a.order_id)+'">Marcar entregado</button>':'')+'</section>';
+  }).join('');
+  document.querySelectorAll('[data-delivery-status]').forEach(btn=>btn.addEventListener('click',()=>updateDeliveryStatus(btn.dataset.order,btn.dataset.deliveryStatus,btn)));
+}
+async function updateDeliveryStatus(orderId,status,button){
+  button.disabled=true;button.textContent='Actualizando…';
+  const {data,error}=await window.merloDb.functions.invoke('manage-delivery-assignment',{body:{action:'update_status',order_id:orderId,status}});
+  if(error||!data?.success){alert(data?.error||error?.message||'No se pudo actualizar la entrega.');button.disabled=false;button.textContent='Reintentar';return}
+  const {data:{user}}=await window.merloDb.auth.getUser();await renderAccount(user);
+}
+function addDeliveryRateRow(){
+  const container=document.getElementById('deliveryRates');if(!container)return;
+  const row=document.createElement('div');row.setAttribute('data-rate-row','');
+  row.style.cssText='border-bottom:1px solid var(--line);padding:10px 0';
+  row.innerHTML='<label class="muted">Nombre del tramo</label><input data-rate-label placeholder="Ej. Hasta 5 km" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:8px;margin:4px 0"><div style="display:flex;gap:7px"><input data-rate-min type="number" min="0" step="0.01" placeholder="Desde km" style="width:33%;padding:9px;border:1px solid var(--line);border-radius:8px"><input data-rate-max type="number" min="0" step="0.01" placeholder="Hasta km (vacío = sin límite)" style="width:33%;padding:9px;border:1px solid var(--line);border-radius:8px"><input data-rate-fee type="number" min="0" step="0.01" placeholder="Importe ARS" style="width:34%;padding:9px;border:1px solid var(--line);border-radius:8px"></div><button class="pill" type="button" onclick="this.closest(\'[data-rate-row]\').remove()">Quitar tramo</button>';
+  container.appendChild(row);
+}
+async function savePlatformAccount(){
+  const body={action:'save_account',account_holder:document.getElementById('platformHolder').value.trim(),bank_name:document.getElementById('platformBank').value.trim(),alias:document.getElementById('platformAlias').value.trim(),cbu:document.getElementById('platformCbu').value.trim()};
+  const note=document.getElementById('adminSettingsNote')||document.getElementById('cartLines');
+  const {data,error}=await window.merloDb.functions.invoke('manage-platform-settings',{body});
+  if(error||!data?.success){note.textContent=data?.error||error?.message||'No se pudo guardar la cuenta.';return}
+  alert('Cuenta de Merlo Ya actualizada.');
+}
+async function saveDeliveryRates(){
+  const rows=[...document.querySelectorAll('[data-rate-row]')];
+  const rates=rows.map(row=>({id:row.dataset.rateId||undefined,label:row.querySelector('[data-rate-label]').value.trim(),min_km:row.querySelector('[data-rate-min]').value,max_km:row.querySelector('[data-rate-max]').value||null,fee:row.querySelector('[data-rate-fee]').value}));
+  const note=document.getElementById('adminSettingsNote');
+  const {data,error}=await window.merloDb.functions.invoke('manage-platform-settings',{body:{action:'save_rates',rates}});
+  if(error||!data?.success){note.textContent=data?.error||error?.message||'No se pudieron guardar las tarifas.';return}
+  note.textContent='Tarifas guardadas ('+data.saved+' tramos).';
+  await renderAccount((await window.merloDb.auth.getUser()).data.user);
+}
+function captureMerchantLocation(){
+  const note=document.getElementById('merchantSettingsNote');
+  if(!navigator.geolocation){note.textContent='Este navegador no permite obtener ubicación.';return}
+  note.textContent='Solicitando permiso de ubicación…';
+  navigator.geolocation.getCurrentPosition(pos=>{
+    document.getElementById('merchantLat').value=pos.coords.latitude;
+    document.getElementById('merchantLon').value=pos.coords.longitude;
+    note.textContent='Ubicación obtenida. Guardá los cambios.';
+  },err=>{note.textContent='No se pudo obtener ubicación: '+err.message},{enableHighAccuracy:true,timeout:15000});
+}
+async function saveMerchantSettings(){
+  const db=window.merloDb,holder=document.getElementById('merchantHolder')?.value.trim();
+  const bank=document.getElementById('merchantBank')?.value.trim(),alias=document.getElementById('merchantAlias')?.value.trim(),cbu=document.getElementById('merchantCbu')?.value.trim();
+  const latRaw=document.getElementById('merchantLat')?.value,lonRaw=document.getElementById('merchantLon')?.value;
+  const lat=Number(latRaw),lon=Number(lonRaw),note=document.getElementById('merchantSettingsNote');
+  if(!holder||(!alias&&!cbu)){note.textContent='Completá titular y al menos alias o CBU.';return}
+  if(!latRaw||!lonRaw||!Number.isFinite(lat)||!Number.isFinite(lon)||lat < -90||lat>90||lon < -180||lon>180){note.textContent='Ingresá coordenadas válidas o usá la ubicación actual.';return}
+  const {data:{user}}=await db.auth.getUser();
+  if(!user){note.textContent='La sesión expiró. Volvé a ingresar.';return}
+  const {error:bankError}=await db.from('merchant_payment_accounts').upsert({merchant_id:user.id,account_holder:holder,bank_name:bank||null,alias:alias||null,cbu:cbu||null},{onConflict:'merchant_id'});
+  if(bankError){note.textContent='No se pudo guardar la cuenta: '+bankError.message;return}
+  const {error:locationError}=await db.from('profiles').update({latitude:lat,longitude:lon}).eq('id',user.id);
+  if(locationError){note.textContent='Cuenta guardada, pero no se pudo guardar la ubicación: '+locationError.message;return}
+  note.textContent='Cuenta y ubicación guardadas correctamente.';
+}
+async function reviewPayment(paymentId,decision,button){
+  button.disabled=true;button.textContent='Guardando…';
+  try{
+    const note=document.getElementById('review-note-'+paymentId)?.value||'';
+    const {data,error}=await window.merloDb.functions.invoke('review-transfer-payment',{body:{payment_id:paymentId,decision,note}});
+    if(error)throw error;
+    if(!data?.success)throw new Error(data?.error||'No se pudo guardar la revisión.');
+    await renderAccount((await window.merloDb.auth.getUser()).data.user);
+  }catch(e){alert(e.message||'Error al revisar el pago.');button.disabled=false;button.textContent=decision==='verified'?'Verificar':'Rechazar'}
+}
+async function accountLogout(){
+  await window.merloDb.auth.signOut();
+  document.getElementById('cartLines').innerHTML='<p class="notice">Sesión cerrada.</p>';
+  document.getElementById('cartBottom').innerHTML='<button class="primary" onclick="closeCart()">Cerrar</button>';
+}
+function renderOrderReceipt(data){
+  const payments=data.payments||[];
+  document.getElementById('cartLines').innerHTML='<h3>Pedido creado</h3><p class="notice">Número de pedido: '+esc(data.order_id)+'</p>'+
+    payments.map(p=>'<div class="cart-line" style="display:block"><b>'+(p.payee_type==='merchant'?'Transferencia al comercio':'Envío · Merlo Ya')+'</b>'+
+      '<div class="muted">'+money(Number(p.amount))+'</div>'+
+      '<div class="notice">'+esc(p.destination_snapshot?.bank_name||'')+' · '+esc(p.destination_snapshot?.account_holder||'')+'</div>'+
+      '<div class="notice">CBU: '+esc(p.destination_snapshot?.cbu||'—')+'<br>Alias: '+esc(p.destination_snapshot?.alias||'—')+'</div>'+
+      '<label class="muted" for="proof-'+esc(p.id)+'">Comprobante (JPG, PNG o PDF; máximo 5 MB)</label>'+
+      '<input id="proof-'+esc(p.id)+'" type="file" accept="image/jpeg,image/png,application/pdf" style="width:100%;margin:8px 0">'+
+      '<button class="pill" type="button" data-proof="'+esc(p.id)+'">Subir comprobante</button>'+
+      '<span class="notice" id="proof-status-'+esc(p.id)+'">'+(p.status==='proof_submitted'?'Comprobante recibido': 'Pendiente de transferencia')+'</span></div>').join('')+
+    '<p class="notice">Transferí cada importe por separado y adjuntá el comprobante correspondiente. El pedido queda sujeto a revisión.</p>';
+  document.querySelectorAll('[data-proof]').forEach(btn=>btn.addEventListener('click',()=>uploadPaymentProof(btn.dataset.proof,btn)));
+  document.getElementById('cartBottom').innerHTML='<button class="primary" type="button" onclick="closeCart()">Cerrar</button>';
+}
+async function uploadPaymentProof(paymentId,button){
+  const db=window.merloDb, input=document.getElementById('proof-'+paymentId), note=document.getElementById('proof-status-'+paymentId);
+  const file=input?.files?.[0];
+  if(!db||!file){if(note)note.textContent='Seleccioná un archivo antes de continuar.';return}
+  const allowed=['image/jpeg','image/png','application/pdf'];
+  if(!allowed.includes(file.type)||file.size>5*1024*1024){note.textContent='Formato no permitido o archivo mayor a 5 MB.';return}
+  button.disabled=true;button.textContent='Subiendo…';note.textContent='';
+  let storagePath=null;
+  try{
+    const {data:{user},error:userError}=await db.auth.getUser();
+    if(userError||!user)throw userError||new Error('Iniciá sesión nuevamente.');
+    const safeName=file.name.normalize('NFKD').replace(/[^a-zA-Z0-9._-]/g,'_').slice(-100)||'comprobante';
+    storagePath=button.dataset.storagePath||user.id+'/'+paymentId+'/'+crypto.randomUUID()+'-'+safeName;
+    if(!button.dataset.storagePath){
+      const {error:uploadError}=await db.storage.from('payment-proofs').upload(storagePath,file,{contentType:file.type,upsert:false});
+      if(uploadError)throw uploadError;
+      button.dataset.storagePath=storagePath;
+    }
+    const {data,error:fnError}=await db.functions.invoke('submit-transfer-proof',{body:{payment_id:paymentId,storage_path:storagePath}});
+    if(fnError)throw fnError;
+    if(!data?.success)throw new Error(data?.error||'No se pudo registrar el comprobante.');
+    note.textContent='Comprobante recibido. Pendiente de revisión.';
+    input.disabled=true;button.disabled=true;button.textContent='Comprobante enviado';delete button.dataset.storagePath;
+  }catch(e){
+    // Keep the uploaded file and reuse its path on retry: the server may have committed
+    // the proof even if the response was lost in transit.
+    note.textContent=e.message||'No se pudo subir el comprobante.';
+    button.disabled=false;button.textContent='Reintentar';
+  }
+}
+async function submitCheckout(){
+  if(checkoutBusy)return;
+  const db=window.merloDb;
+  const email=document.getElementById('coEmail')?.value.trim(),password=document.getElementById('coPassword')?.value;
+  const address=document.getElementById('coAddress')?.value.trim(),zone=document.getElementById('coZone')?.value.trim(),phone=document.getElementById('coPhone')?.value.trim();
+  const error=document.getElementById('coError'),button=document.getElementById('coSubmit');
+  if(!db){error.textContent='No se pudo inicializar la conexión con el servicio.';return}
+  if(!email||!password||!address||!deliveryCoords){error.textContent='Completá email, contraseña, dirección y ubicación.';return}
+  if(cart.some(x=>!x.productId)){error.textContent='Hay productos de muestra en el carrito. Quitalos antes de continuar.';return}
+  checkoutBusy=true;button.disabled=true;button.textContent='Creando pedido…';error.textContent='';
+  try{
+    const {data:authData,error:authError}=await db.auth.signInWithPassword({email,password});
+    if(authError||!authData.user)throw authError||new Error('No se pudo iniciar sesión.');
+    checkoutIdempotencyKey=checkoutIdempotencyKey||crypto.randomUUID();
+    sessionStorage.setItem('merloYaCheckoutKey',checkoutIdempotencyKey);
+    const {data,error:fnError}=await db.functions.invoke('create-transfer-order',{headers:{'Idempotency-Key':checkoutIdempotencyKey},body:{delivery_address:address,delivery_zone:zone,customer_phone:phone,delivery_latitude:deliveryCoords.lat,delivery_longitude:deliveryCoords.lon,items:cart.map(x=>({product_id:x.productId,quantity:x.qty}))}});
+    if(fnError){
+      if(fnError.context?.status===409){checkoutIdempotencyKey=null;sessionStorage.removeItem('merloYaCheckoutKey');}
+      throw fnError;
+    }
+    if(!data||!data.order_id)throw new Error(data?.error||'El servidor no confirmó la creación del pedido.');
+    renderOrderReceipt(data);
+    cart=[];checkoutIdempotencyKey=null;sessionStorage.removeItem('merloYaCheckoutKey');document.getElementById('cartCount').textContent='0';
+  }catch(e){error.textContent=e.message||'No se pudo crear el pedido. Verificá los datos e intentá nuevamente.';button.disabled=false;button.textContent='Reintentar'}
+  finally{checkoutBusy=false}
+}
+function changeQty(i,d){if(!cart[i])return;cart[i].qty+=d;if(cart[i].qty<=0)cart.splice(i,1);updateCart()}
+function openCart(){updateCart();document.getElementById('overlay').classList.add('open')}function closeCart(){document.getElementById('overlay').classList.remove('open')}
+render();updateCart();
+</script>
+<!-- Conexión de catálogo público: solo lectura -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+(() => {
+  const SUPABASE_URL = 'https://pdkbdcimpzfemerfrcjj.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_EZkOnb4CVwm-UD77_fqvdw_YetVafm6';
+  const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  window.merloDb = db;
+  const demoStores = stores.slice();
+  window.catalogStatus = 'loading';
+  async function loadCatalog() {
+    try {
+      const [{data: merchants, error: merchantError},{data: products, error: productError}] = await Promise.all([
+        db.from('public_merchants').select('id,nombre,rubro,zona'),
+        db.from('products').select('id,comercio_id,nombre,precio')
+      ]);
+      if (merchantError) throw merchantError;
+      if (productError) throw productError;
+      const live = (merchants || []).map(m => {
+        const items = (products || []).filter(p => p.comercio_id === m.id)
+          .map(p => [p.nombre, Number(p.precio) || 0, p.id]);
+        return {name:m.nombre || 'Comercio',cat:m.rubro || 'Comercios',
+          desc:m.zona || 'Comercio local',img:'',products:items,live:true,id:m.id};
+      });
+      if (live.length) {
+        // Mantener los comercios de muestra mientras el catálogo real se completa.
+        // Si un comercio real tiene el mismo nombre, prevalece su ficha de Supabase.
+        const liveNames = new Set(live.map(s => s.name.trim().toLowerCase()));
+        const samples = demoStores.filter(s => !liveNames.has(s.name.trim().toLowerCase()));
+        stores.splice(0, stores.length, ...live, ...samples);
+        window.catalogStatus = 'live';
+      } else {
+        stores.splice(0, stores.length, ...demoStores);
+        window.catalogStatus = 'empty';
+      }
+      render();
+      const note = document.getElementById('catalog-note');
+      if (note) note.textContent = live.length
+        ? live.length + ' comercio(s) real(es) conectado(s). También se muestran comercios de ejemplo mientras se completa el catálogo.'
+        : 'Todavía no hay comercios publicados. Esta vista conserva ejemplos.';
+    } catch (e) {
+      console.warn('No se pudo cargar el catálogo:', e.message);
+      window.catalogStatus = 'error';
+      const note = document.getElementById('catalog-note');
+      if (note) note.textContent = 'No se pudo conectar al catálogo; se muestran ejemplos.';
+    }
+  }
+  loadCatalog();
+})();
+</script>
+</body></html>

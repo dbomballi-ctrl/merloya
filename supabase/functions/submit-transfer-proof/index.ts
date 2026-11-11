@@ -28,7 +28,7 @@ Deno.serve(async (req) => {
     }
     const { data: payment } = await db.from("transfer_payments")
       .select("id,order_id,status").eq("id", payment_id).single();
-    if (!payment || !["awaiting_transfer", "rejected"].includes(payment.status)) {
+    if (!payment || !["awaiting_transfer", "rejected", "proof_submitted"].includes(payment.status)) {
       return json({ error: "El pago no admite un nuevo comprobante." }, 409);
     }
     const { data: order } = await db.from("orders").select("customer_id").eq("id", payment.order_id).single();
@@ -37,13 +37,19 @@ Deno.serve(async (req) => {
     const { data: file } = await db.storage.from("payment-proofs").list(`${user.id}/${payment_id}`, { search: String(storage_path).split("/").pop() });
     if (!file?.length) return json({ error: "No se encontró el archivo subido al almacenamiento privado." }, 404);
 
-    const { error: proofError } = await db.from("payment_proofs").insert({
-      payment_id, storage_path, uploaded_by: user.id,
+    const { data: result, error: submitError } = await db.rpc("register_merlo_payment_proof", {
+      p_payment_id: payment_id, p_storage_path: storage_path, p_actor_id: user.id,
     });
-    if (proofError) throw proofError;
-    const { error: updateError } = await db.from("transfer_payments").update({ status: "proof_submitted" }).eq("id", payment_id);
-    if (updateError) throw updateError;
-    return json({ success: true, status: "proof_submitted" });
+    if (submitError) {
+      if (submitError.message?.includes("PAYMENT_NOT_ACCEPTING_PROOF")) {
+        return json({ error: "El pago ya no admite comprobantes en su estado actual." }, 409);
+      }
+      if (submitError.message?.includes("PAYMENT_NOT_OWNED")) {
+        return json({ error: "No podés adjuntar un comprobante a este pedido." }, 403);
+      }
+      throw submitError;
+    }
+    return json({ success: true, status: result?.status ?? "proof_submitted" });
   } catch (error) {
     console.error(error);
     return json({ error: error instanceof Error ? error.message : "No se pudo registrar el comprobante." }, 500);

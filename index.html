@@ -118,7 +118,7 @@ function showCheckout(){
   document.getElementById('cartLines').innerHTML=`
     <h3>Datos para el pedido</h3>
     <label class="muted">Modalidad</label>
-    <select id="coFulfillment" onchange="toggleFulfillmentFields()" style="width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;margin:5px 0 12px">
+    <select id="coFulfillment" onchange="resetCheckoutKey();toggleFulfillmentFields()" style="width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;margin:5px 0 12px">
       <option value="delivery">Delivery Merlo Ya</option>
       <option value="pickup">Retiro gratuito en el comercio</option>
     </select>
@@ -127,12 +127,11 @@ function showCheckout(){
     <div id="deliveryFields">
       <label class="muted">Dirección de entrega</label><input id="coAddress" placeholder="Calle y número" oninput="resetCheckoutKey()" style="width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;margin:5px 0 12px">
       <label class="muted">Barrio / zona (opcional)</label><input id="coZone" placeholder="Barrio" oninput="resetCheckoutKey()" style="width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;margin:5px 0 12px">
-      <label class="muted">Teléfono</label><input id="coPhone" type="tel" placeholder="Código de área y número" oninput="resetCheckoutKey()" style="width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;margin:5px 0 12px">
       <button class="pill" type="button" onclick="captureDeliveryLocation()">Usar mi ubicación actual</button>
       <p id="coLocation" class="notice">La ubicación se solicita solo cuando tocás el botón.</p>
     </div>
+    <label class="muted">Teléfono de contacto</label><input id="coPhone" type="tel" placeholder="Código de área y número" oninput="resetCheckoutKey()" style="width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;margin:5px 0 12px">
     <p id="coError" class="notice" role="status"></p>`;
-  document.getElementById('cartBottom')
   document.getElementById('cartBottom').innerHTML='<button id="coSubmit" class="primary" type="button" onclick="submitCheckout()">Crear pedido</button><button class="pill" style="width:100%;margin-top:8px" type="button" onclick="updateCart()">Volver al carrito</button><p class="notice">Se generan instrucciones de transferencia. No se debita dinero automáticamente.</p>';
 }
 function toggleFulfillmentFields(){

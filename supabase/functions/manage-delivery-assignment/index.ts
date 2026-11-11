@@ -32,11 +32,12 @@ Deno.serve(async (req) => {
       if (!orderId || !courierId) return json({ error: "Falta el pedido o el repartidor." }, 400);
 
       const [{ data: order, error: orderError }, { data: courier, error: courierError }] = await Promise.all([
-        db.from("orders").select("id,status").eq("id", orderId).single(),
+        db.from("orders").select("id,status,fulfillment_type").eq("id", orderId).single(),
         db.from("profiles").select("id,role").eq("id", courierId).single(),
       ]);
       if (orderError || !order) return json({ error: "Pedido inexistente." }, 404);
       if (order.status !== "confirmed") return json({ error: "Solo se pueden asignar pedidos con todos los pagos confirmados." }, 409);
+      if (order.fulfillment_type !== "delivery") return json({ error: "Los pedidos con retiro en comercio no requieren repartidor." }, 409);
       if (courierError || courier?.role !== "repartidor") return json({ error: "La cuenta seleccionada no es un repartidor habilitado." }, 400);
 
       const { data: existing } = await db.from("delivery_assignments").select("id,status").eq("order_id", orderId).maybeSingle();

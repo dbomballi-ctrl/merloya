@@ -102,7 +102,7 @@ Deno.serve(async (req) => {
           !Number.isFinite(Number(merchant.latitude)) || !Number.isFinite(Number(merchant.longitude)))) {
         return json({ error: `El comercio ${merchant.nombre} todavía no tiene ubicación cargada.` }, 409);
       }
-      if (fulfillmentType === "pickup" && !String(merchant.domicilio ?? merchant.zona ?? "").trim()) {
+      if (fulfillmentType === "pickup" && !String(merchant.domicilio ?? "").trim()) {
         return json({ error: `El comercio ${merchant.nombre} todavía no informó dónde retirar.` }, 409);
       }
       if (!bank || (!bank.cbu && !bank.alias)) {

@@ -328,8 +328,8 @@ async function renderAccount(user){
         '<label class="muted">Longitud</label><input id="merchantLon" type="number" step="any" value="'+esc(location?.longitude??'')+'" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:9px;margin:5px 0 10px">'+
         '<button class="pill" type="button" onclick="captureMerchantLocation()">Usar ubicación actual</button><button class="primary" style="margin-top:8px" type="button" onclick="saveMerchantSettings()">Guardar datos</button><p id="merchantSettingsNote" class="notice">El alias o CBU y la ubicación son necesarios para recibir pedidos.</p></section>';
     }
-    if(profile.role==='comercio')merchantSettings=await renderMerchantProfile(user.id)+await renderMerchantCatalog(user.id)+merchantSettings;
-    if(profile.role==='admin')merchantSettings=await renderCatalogModeration()+await renderAdminCatalogManager()+merchantSettings;
+    if(profile.role==='comercio')merchantSettings=await renderMerchantProfile(user.id)+await renderMerchantCatalog(user.id)+await renderMerchantOrders(user.id)+merchantSettings;
+    if(profile.role==='admin')merchantSettings=await renderCatalogModeration()+await renderAdminCatalogManager()+await renderAdminOrderMonitor()+merchantSettings;
     let query=db.from('transfer_payments').select('id,order_id,merchant_id,payee_type,amount,status,created_at').eq('status','proof_submitted').order('created_at',{ascending:false}).limit(50);
     if(profile.role==='comercio')query=query.eq('merchant_id',user.id).eq('payee_type','merchant');
     const {data:payments,error}=await query;
@@ -497,6 +497,36 @@ async function refreshAdminCatalog(){
   const {data:{user}}=await window.merloDb.auth.getUser();
   if(user)await renderAccount(user);
   await window.refreshPublicCatalog?.();
+}
+
+
+async function merchantOrderAction(body){
+  const {data,error}=await window.merloDb.functions.invoke('manage-merchant-orders',{body});
+  if(error||!data?.success)throw new Error(data?.error||error?.message||'No se pudo actualizar el pedido.');
+  return data;
+}
+function merchantOrderStatusLabel(status){return ({awaiting_transfers:'Esperando transferencias',payment_review:'Pago en revisión',confirmed:'Confirmado',preparing:'En preparación',dispatched:'Despachado',delivered:'Entregado',cancelled:'Cancelado'}[status]||status)}
+async function renderMerchantOrders(){
+  try{
+    const {orders}=await merchantOrderAction({action:'list'});
+    return '<section class="catalog-manager"><h3>Pedidos del comercio</h3><p class="notice">Los pedidos se habilitan para preparación cuando Merlo Ya confirma todos los pagos. En retiro, el comercio marca la entrega; en delivery, la finaliza el repartidor.</p>'+
+      (orders||[]).map(o=>'<article class="catalog-product"><div><b>Pedido '+esc(o.order_id.slice(0,8))+' · '+esc(o.orders.fulfillment_type==='pickup'?'Retiro':'Delivery')+'</b><div class="catalog-status">'+new Date(o.created_at).toLocaleString('es-AR')+' · '+merchantOrderStatusLabel(o.status)+'</div>'+
+      '<div class="catalog-status">'+(o.order_items||[]).map(x=>esc(x.quantity+' × '+x.product_name_snapshot)+' ('+money(Number(x.unit_price))+')').join('<br>')+'</div><div class="catalog-status">Subtotal '+money(Number(o.subtotal))+' · Envío '+money(Number(o.shipping_fee))+'</div><div class="catalog-status">'+esc(o.delivery_address_snapshot||'')+(o.orders.customer_phone?' · '+esc(o.orders.customer_phone):'')+'</div></div>'+
+      '<div class="catalog-actions">'+(o.status==='confirmed'?'<button type="button" onclick="updateMerchantOrder(\''+esc(o.id)+'\',\'preparing\')">Preparar</button>':'')+
+      (o.status==='preparing'&&o.orders.fulfillment_type==='delivery'?'<button type="button" onclick="updateMerchantOrder(\''+esc(o.id)+'\',\'dispatched\')">Listo para retirar</button>':'')+
+      (o.status==='preparing'&&o.orders.fulfillment_type==='pickup'?'<button type="button" onclick="updateMerchantOrder(\''+esc(o.id)+'\',\'delivered\')">Entregado al cliente</button>':'')+'</div></article>').join('')||'<p class="notice">Todavía no hay pedidos para este comercio.</p>')+'</section>';
+  }catch(e){return '<section class="catalog-manager"><h3>Pedidos del comercio</h3><p class="notice">'+esc(e.message)+'</p></section>'}
+}
+async function renderAdminOrderMonitor(){
+  try{
+    const {orders}=await merchantOrderAction({action:'list'});
+    return '<section class="catalog-manager"><h3>Seguimiento de pedidos</h3><p class="notice">Vista general de pedidos por comercio. Los estados se actualizan en los paneles de cada comercio y repartidor.</p>'+
+      (orders||[]).map(o=>'<div class="catalog-product"><div><b>'+esc(o.merchant_name_snapshot)+' · Pedido '+esc(o.order_id.slice(0,8))+'</b><div class="catalog-status">'+new Date(o.created_at).toLocaleString('es-AR')+' · '+merchantOrderStatusLabel(o.status)+' · '+esc(o.orders.fulfillment_type==='pickup'?'Retiro':'Delivery')+'</div><div class="catalog-status">'+(o.order_items||[]).map(x=>esc(x.quantity+' × '+x.product_name_snapshot)).join('<br>')+'</div></div><b>'+money(Number(o.subtotal)+Number(o.shipping_fee))+'</b></div>').join('')||'<p class="notice">Todavía no hay pedidos.</p>')+'</section>';
+  }catch(e){return '<section class="catalog-manager"><h3>Seguimiento de pedidos</h3><p class="notice">'+esc(e.message)+'</p></section>'}
+}
+async function updateMerchantOrder(id,status){
+  try{await merchantOrderAction({action:'update_status',merchant_order_id:id,status});const {data:{user}}=await window.merloDb.auth.getUser();if(user)await renderAccount(user)}
+  catch(e){alert(e.message)}
 }
 
 async function renderCatalogModeration(){

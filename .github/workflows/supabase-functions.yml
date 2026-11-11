@@ -2,17 +2,20 @@ name: Supabase Edge Functions
 
 on:
   pull_request:
-    branches: [main, merlo-ya-2.0-dev]
+    branches: [main, merlo-ya-2.0-frontend-rebuild]
     paths:
       - "supabase/functions/**"
-      - "preview-v2.html"
+      - "index.html"
       - ".github/workflows/supabase-functions.yml"
   push:
-    branches: [main, merlo-ya-2.0-dev]
+    branches: [main, merlo-ya-2.0-frontend-rebuild]
     paths:
       - "supabase/functions/**"
-      - "preview-v2.html"
+      - "index.html"
       - ".github/workflows/supabase-functions.yml"
+
+permissions:
+  contents: read
 
 jobs:
   check:
@@ -24,11 +27,10 @@ jobs:
           deno-version: v2.x
       - name: Type-check Edge Functions
         run: |
-          deno check supabase/functions/create-transfer-order/index.ts
-          deno check supabase/functions/submit-transfer-proof/index.ts
-          deno check supabase/functions/review-transfer-payment/index.ts
-          deno check supabase/functions/manage-platform-settings/index.ts
-          deno check supabase/functions/manage-delivery-assignment/index.ts
+          for fn in supabase/functions/*/index.ts; do
+            echo "Checking $fn"
+            deno check "$fn"
+          done
       - name: Check inline JavaScript and static HTML IDs
         run: |
           python3 - <<'PY'
@@ -37,10 +39,10 @@ jobs:
           import re
           import subprocess
 
-          html = Path("preview-v2.html").read_text(encoding="utf-8")
-          scripts = re.findall(r'<script\b(?![^>]*\bsrc\s*=)[^>]*>(.*?)</script\s*>', html, re.I | re.S)
+          html = Path("index.html").read_text(encoding="utf-8")
+          scripts = re.findall(r'<script\\b(?![^>]*\\bsrc\\s*=)[^>]*>(.*?)</script\\s*>', html, re.I | re.S)
           if not scripts:
-              raise SystemExit("No inline JavaScript found in preview-v2.html")
+              raise SystemExit("No inline JavaScript found in index.html")
           for index, source in enumerate(scripts):
               path = Path(f"/tmp/merlo-inline-{index}.js")
               path.write_text(source, encoding="utf-8")

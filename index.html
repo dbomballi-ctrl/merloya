@@ -434,7 +434,7 @@ async function demoteCourier(userId,button){
 }
 async function renderAdminDeliveryAssignments(){
   const db=window.merloDb;
-  const {data:orders,error:orderError}=await db.from('orders').select('id,created_at,total_amount').eq('status','confirmed').order('created_at',{ascending:false}).limit(30);
+  const {data:orders,error:orderError}=await db.from('orders').select('id,created_at,total_amount').eq('status','confirmed').eq('fulfillment_type','delivery').order('created_at',{ascending:false}).limit(30);
   if(orderError)throw orderError;
   const container=document.getElementById('cartLines');
   if(!orders?.length){container.innerHTML+='<section style="border:1px solid var(--line);border-radius:12px;padding:12px;margin:12px 0"><h3>Asignación de repartidores</h3><p class="notice">No hay pedidos con pagos confirmados para asignar.</p></section>';return}

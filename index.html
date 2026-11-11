@@ -97,6 +97,7 @@ function showProducts(name){
   document.getElementById('overlay').classList.add('open');
 }
 function add(name,i){
+  resetCheckoutKey();
   const s=stores.find(x=>x.name===name),p=s?.products[i];if(!p)return;
   const key=name+'|'+p[0],item=cart.find(x=>x.key===key);
   if(item)item.qty++;else cart.push({key,store:name,name:p[0],price:Number(p[1])||0,productId:p[2]||null,qty:1});
@@ -109,11 +110,12 @@ function updateCart(){
   const total=cart.reduce((a,x)=>a+x.price*x.qty,0);
   document.getElementById('cartBottom').innerHTML='<div class="total"><span>Subtotal</span><span>'+money(total)+'</span></div><button class="primary" type="button" onclick="showCheckout()">Continuar al checkout</button><p class="notice">Los productos de muestra no se pueden comprar. Se requiere una cuenta de cliente y ubicación de entrega.</p><p class="notice">Vista previa: no se realizan compras ni pagos reales.</p>';
 }
-let checkoutBusy=false,deliveryCoords=null;
+let checkoutBusy=false,deliveryCoords=null,checkoutIdempotencyKey=sessionStorage.getItem('merloYaCheckoutKey')||null;
+function resetCheckoutKey(){checkoutIdempotencyKey=null;sessionStorage.removeItem('merloYaCheckoutKey')}
 function showCheckout(){
   if(!cart.length)return;
   if(cart.some(x=>!x.productId)){alert('El carrito contiene productos de muestra. Elegí productos publicados por comercios reales para continuar.');return}
-  document.getElementById('cartLines').innerHTML='<h3>Datos para el pedido</h3><label class="muted">Email de tu cuenta</label><input id="coEmail" type="email" autocomplete="username" placeholder="tu@email.com" style="width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;margin:5px 0 12px"><label class="muted">Contraseña</label><input id="coPassword" type="password" autocomplete="current-password" placeholder="Contraseña" style="width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;margin:5px 0 12px"><label class="muted">Dirección de entrega</label><input id="coAddress" placeholder="Calle y número" style="width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;margin:5px 0 12px"><label class="muted">Barrio / zona (opcional)</label><input id="coZone" placeholder="Barrio" style="width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;margin:5px 0 12px"><label class="muted">Teléfono</label><input id="coPhone" type="tel" placeholder="Código de área y número" style="width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;margin:5px 0 12px"><button class="pill" type="button" onclick="captureDeliveryLocation()">Usar mi ubicación actual</button><p id="coLocation" class="notice">La ubicación se solicita solo cuando tocás el botón.</p><p id="coError" class="notice" role="status"></p>';
+  document.getElementById('cartLines').innerHTML='<h3>Datos para el pedido</h3><label class="muted">Email de tu cuenta</label><input id="coEmail" type="email" autocomplete="username" oninput="resetCheckoutKey()" placeholder="tu@email.com" style="width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;margin:5px 0 12px"><label class="muted">Contraseña</label><input id="coPassword" type="password" autocomplete="current-password" placeholder="Contraseña" style="width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;margin:5px 0 12px"><label class="muted">Dirección de entrega</label><input id="coAddress" placeholder="Calle y número" oninput="resetCheckoutKey()" style="width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;margin:5px 0 12px"><label class="muted">Barrio / zona (opcional)</label><input id="coZone" placeholder="Barrio" oninput="resetCheckoutKey()" style="width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;margin:5px 0 12px"><label class="muted">Teléfono</label><input id="coPhone" type="tel" placeholder="Código de área y número" oninput="resetCheckoutKey()" style="width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;margin:5px 0 12px"><button class="pill" type="button" onclick="captureDeliveryLocation()">Usar mi ubicación actual</button><p id="coLocation" class="notice">La ubicación se solicita solo cuando tocás el botón.</p><p id="coError" class="notice" role="status"></p>';
   document.getElementById('cartBottom').innerHTML='<button id="coSubmit" class="primary" type="button" onclick="submitCheckout()">Crear pedido</button><button class="pill" style="width:100%;margin-top:8px" type="button" onclick="updateCart()">Volver al carrito</button><p class="notice">Se generan instrucciones de transferencia. No se debita dinero automáticamente.</p>';
 }
 function captureDeliveryLocation(){
@@ -386,15 +388,17 @@ async function submitCheckout(){
   try{
     const {data:authData,error:authError}=await db.auth.signInWithPassword({email,password});
     if(authError||!authData.user)throw authError||new Error('No se pudo iniciar sesión.');
-    const {data,error:fnError}=await db.functions.invoke('create-transfer-order',{body:{delivery_address:address,delivery_zone:zone,customer_phone:phone,delivery_latitude:deliveryCoords.lat,delivery_longitude:deliveryCoords.lon,items:cart.map(x=>({product_id:x.productId,quantity:x.qty}))}});
+    checkoutIdempotencyKey=checkoutIdempotencyKey||crypto.randomUUID();
+    sessionStorage.setItem('merloYaCheckoutKey',checkoutIdempotencyKey);
+    const {data,error:fnError}=await db.functions.invoke('create-transfer-order',{body:{idempotency_key:checkoutIdempotencyKey,delivery_address:address,delivery_zone:zone,customer_phone:phone,delivery_latitude:deliveryCoords.lat,delivery_longitude:deliveryCoords.lon,items:cart.map(x=>({product_id:x.productId,quantity:x.qty}))}});
     if(fnError)throw fnError;
     if(!data||!data.order_id)throw new Error(data?.error||'El servidor no confirmó la creación del pedido.');
     renderOrderReceipt(data);
-    cart=[];document.getElementById('cartCount').textContent='0';
+    cart=[];resetCheckoutKey();document.getElementById('cartCount').textContent='0';
   }catch(e){error.textContent=e.message||'No se pudo crear el pedido. Verificá los datos e intentá nuevamente.';button.disabled=false;button.textContent='Reintentar'}
   finally{checkoutBusy=false}
 }
-function changeQty(i,d){if(!cart[i])return;cart[i].qty+=d;if(cart[i].qty<=0)cart.splice(i,1);updateCart()}
+function changeQty(i,d){if(!cart[i])return;resetCheckoutKey();cart[i].qty+=d;if(cart[i].qty<=0)cart.splice(i,1);updateCart()}
 function openCart(){updateCart();document.getElementById('overlay').classList.add('open')}function closeCart(){document.getElementById('overlay').classList.remove('open')}
 render();updateCart();
 </script>

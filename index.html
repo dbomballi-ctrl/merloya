@@ -115,6 +115,7 @@ function resetCheckoutKey(){checkoutIdempotencyKey=null;sessionStorage.removeIte
 function showCheckout(){
   if(!cart.length)return;
   if(cart.some(x=>!x.productId)){alert('El carrito contiene productos de muestra. Elegí productos publicados por comercios reales para continuar.');return}
+  deliveryCoords=null;
   document.getElementById('cartLines').innerHTML=`
     <h3>Datos para el pedido</h3>
     <label class="muted">Modalidad</label>
@@ -125,7 +126,7 @@ function showCheckout(){
     <label class="muted">Email de tu cuenta</label><input id="coEmail" type="email" autocomplete="username" oninput="resetCheckoutKey()" placeholder="tu@email.com" style="width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;margin:5px 0 12px">
     <label class="muted">Contraseña</label><input id="coPassword" type="password" autocomplete="current-password" placeholder="Contraseña" style="width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;margin:5px 0 12px">
     <div id="deliveryFields">
-      <label class="muted">Dirección de entrega</label><input id="coAddress" placeholder="Calle y número" oninput="resetCheckoutKey()" style="width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;margin:5px 0 12px">
+      <label class="muted">Dirección de entrega</label><input id="coAddress" placeholder="Calle y número" oninput="deliveryCoords=null;resetCheckoutKey()" style="width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;margin:5px 0 12px">
       <label class="muted">Barrio / zona (opcional)</label><input id="coZone" placeholder="Barrio" oninput="resetCheckoutKey()" style="width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;margin:5px 0 12px">
       <button class="pill" type="button" onclick="captureDeliveryLocation()">Usar mi ubicación actual</button>
       <p id="coLocation" class="notice">La ubicación se solicita solo cuando tocás el botón.</p>

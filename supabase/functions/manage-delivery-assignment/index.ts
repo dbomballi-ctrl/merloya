@@ -38,6 +38,12 @@ Deno.serve(async (req) => {
       if (orderError || !order) return json({ error: "Pedido inexistente." }, 404);
       if (order.status !== "confirmed") return json({ error: "Solo se pueden asignar pedidos con todos los pagos confirmados." }, 409);
       if (order.fulfillment_type !== "delivery") return json({ error: "Los pedidos con retiro en comercio no requieren repartidor." }, 409);
+      const { data: merchantOrders, error: merchantOrdersError } = await db.from("merchant_orders")
+        .select("id,status").eq("order_id", orderId);
+      if (merchantOrdersError) throw merchantOrdersError;
+      if (!merchantOrders?.length || merchantOrders.some(x => x.status !== "dispatched")) {
+        return json({ error: "Todos los comercios deben marcar sus pedidos como listos para reparto antes de asignar un repartidor." }, 409);
+      }
       if (courierError || courier?.role !== "repartidor") return json({ error: "La cuenta seleccionada no es un repartidor habilitado." }, 400);
 
       const { data: existing } = await db.from("delivery_assignments").select("id,status").eq("order_id", orderId).maybeSingle();

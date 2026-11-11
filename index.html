@@ -173,15 +173,16 @@ async function renderAccount(user){
   const {data:profile,error:profileError}=await db.from('profiles').select('id,nombre,role').eq('id',user.id).single();
   if(profileError||!profile){document.getElementById('cartLines').innerHTML='<p class="notice">La cuenta no tiene un perfil asociado. Contactá al administrador.</p>';return}
   if(profile.role==='usuario'){
+    const merchantRequest=await renderMerchantRequest(user.id);
     const {data:orders,error}=await db.from('orders').select('id,status,subtotal,shipping_total,total_amount,created_at,delivery_address,is_demo').eq('customer_id',user.id).order('created_at',{ascending:false}).limit(25);
     if(error)throw error;
-    if(!orders?.length){document.getElementById('cartLines').innerHTML='<h3>Mis pedidos</h3><p class="notice">Todavía no tenés pedidos.</p>';return}
+    if(!orders?.length){document.getElementById('cartLines').innerHTML=merchantRequest+'<h3>Mis pedidos</h3><p class="notice">Todavía no tenés pedidos.</p>';return}
     const ids=orders.map(o=>o.id);
     const {data:payments,error:paymentError}=await db.from('transfer_payments')
       .select('id,order_id,payee_type,amount,destination_snapshot,status').in('order_id',ids).order('created_at',{ascending:true});
     if(paymentError)throw paymentError;
     const statusLabel={awaiting_transfers:'Esperando transferencias',demo:'Pedido de prueba',payment_review:'Pago observado',confirmed:'Pago confirmado',cancelled:'Cancelado',proof_submitted:'Comprobante enviado',verified:'Transferencia verificada',rejected:'Comprobante rechazado'};
-    document.getElementById('cartLines').innerHTML='<h3>Mis pedidos</h3>'+orders.map(o=>'<section style="border:1px solid var(--line);border-radius:12px;padding:12px;margin:12px 0"><b>Pedido '+esc(o.id.slice(0,8))+'</b><p class="muted">'+new Date(o.created_at).toLocaleString('es-AR')+' · '+esc(o.is_demo?'Pedido de prueba confirmado':(statusLabel[o.status]||o.status))+'</p><p class="muted">'+esc(o.delivery_address)+'</p>'+'<div class="total"><span>Total</span><span>'+money(Number(o.total_amount))+'</span></div>'+
+    document.getElementById('cartLines').innerHTML=merchantRequest+'<h3>Mis pedidos</h3>'+orders.map(o=>'<section style="border:1px solid var(--line);border-radius:12px;padding:12px;margin:12px 0"><b>Pedido '+esc(o.id.slice(0,8))+'</b><p class="muted">'+new Date(o.created_at).toLocaleString('es-AR')+' · '+esc(o.is_demo?'Pedido de prueba confirmado':(statusLabel[o.status]||o.status))+'</p><p class="muted">'+esc(o.delivery_address)+'</p>'+'<div class="total"><span>Total</span><span>'+money(Number(o.total_amount))+'</span></div>'+
       (payments||[]).filter(x=>x.order_id===o.id).map(x=>'<div class="cart-line" style="display:block"><b>'+(x.payee_type==='merchant'?'Comercio':'Envío · Merlo Ya')+' · '+money(Number(x.amount))+'</b><p class="muted">'+esc(statusLabel[x.status]||x.status)+'</p><p class="muted">'+esc(x.destination_snapshot?.bank_name||'')+' · '+esc(x.destination_snapshot?.account_holder||'')+'<br>CBU: '+esc(x.destination_snapshot?.cbu||'—')+'<br>Alias: '+esc(x.destination_snapshot?.alias||'—')+'</p>'+
       (['awaiting_transfer','rejected'].includes(x.status)?'<label class="muted" for="proof-'+esc(x.id)+'">Adjuntar comprobante (JPG, PNG o PDF; máximo 5 MB)</label><input id="proof-'+esc(x.id)+'" type="file" accept="image/jpeg,image/png,application/pdf" style="width:100%;margin:7px 0"><button class="pill" data-proof="'+esc(x.id)+'" type="button">Subir comprobante</button><span id="proof-status-'+esc(x.id)+'" class="notice"></span>':'')+'</div>').join('')+'</section>').join('');
     document.querySelectorAll('[data-proof]').forEach(btn=>btn.addEventListener('click',()=>uploadPaymentProof(btn.dataset.proof,btn)));
@@ -244,10 +245,42 @@ async function renderAccount(user){
   }
 }
 
+async function renderMerchantRequest(userId){
+  const db=window.merloDb;
+  const {data:requests}=await db.from('merchant_profile_submissions').select('status,created_at,review_note,proposed_data').eq('merchant_id',userId).order('created_at',{ascending:false}).limit(3);
+  const latest=(requests||[]).find(x=>x.proposed_data?.requested_role==='comercio');
+  if(latest?.status==='pending')return '<section class="catalog-manager"><h3>Alta de comercio</h3><p class="notice">Tu solicitud está pendiente de aprobación de Merlo Ya.</p></section>';
+  if(latest?.status==='rejected')return '<section class="catalog-manager"><h3>Alta de comercio</h3><p class="notice">Tu solicitud necesita correcciones. Podés volver a enviarla.</p></section>';
+  return '<section class="catalog-manager"><h3>Quiero vender en Merlo Ya</h3><p class="notice">Completá los datos de tu negocio. Merlo Ya revisará la información antes de habilitar tu tienda.</p>'+
+    '<div class="form-field"><label for="merchantRequestName">Nombre del comercio</label><input id="merchantRequestName" maxlength="120" placeholder="Ej. Almacén del Centro"></div>'+
+    '<div class="form-field"><label for="merchantRequestCategory">Rubro</label><input id="merchantRequestCategory" maxlength="80" placeholder="Almacén, comida, farmacia…"></div>'+
+    '<div class="form-field"><label for="merchantRequestZone">Zona / barrio</label><input id="merchantRequestZone" maxlength="120" placeholder="Centro, Piedra Blanca…"></div>'+
+    '<div class="form-field"><label for="merchantRequestWhatsapp">WhatsApp del comercio</label><input id="merchantRequestWhatsapp" type="tel" maxlength="40" placeholder="+54 9 …"></div>'+
+    '<div class="form-field"><label for="merchantRequestImage">Foto del comercio (URL HTTPS)</label><input id="merchantRequestImage" type="url" maxlength="1000" placeholder="https://…"></div>'+
+    '<button class="primary" type="button" onclick="submitMerchantRequest()">Enviar solicitud de alta</button><p id="merchantRequestNote" class="catalog-status" role="status"></p></section>';
+}
+async function submitMerchantRequest(){
+  const db=window.merloDb,{data:{user}}=await db.auth.getUser();
+  if(!user)return;
+  const proposed_data={
+    nombre:document.getElementById('merchantRequestName')?.value.trim(),
+    rubro:document.getElementById('merchantRequestCategory')?.value.trim(),
+    zona:document.getElementById('merchantRequestZone')?.value.trim(),
+    whatsapp:document.getElementById('merchantRequestWhatsapp')?.value.trim(),
+    store_image_url:document.getElementById('merchantRequestImage')?.value.trim(),
+    requested_role:'comercio'
+  };
+  const note=document.getElementById('merchantRequestNote');
+  if(!proposed_data.nombre||!proposed_data.rubro){note.textContent='Completá nombre y rubro.';return}
+  if(proposed_data.store_image_url&&!/^https:\/\//i.test(proposed_data.store_image_url)){note.textContent='La foto debe usar HTTPS.';return}
+  const {error}=await db.from('merchant_profile_submissions').insert({merchant_id:user.id,proposed_data});
+  if(error){note.textContent='No se pudo enviar: '+error.message;return}
+  note.textContent='Solicitud enviada. Cuando Merlo Ya la apruebe, tu cuenta se habilitará como comercio.';
+}
 async function renderMerchantProfile(userId){
   const db=window.merloDb;
   const [{data:p},{data:submissions}]=await Promise.all([
-    db.from('profiles').select('nombre,rubro,zona,store_image_url').eq('id',userId).single(),
+    db.from('profiles').select('nombre,rubro,zona,store_image_url,whatsapp').eq('id',userId).single(),
     db.from('merchant_profile_submissions').select('status,created_at,review_note').eq('merchant_id',userId).order('created_at',{ascending:false}).limit(3)
   ]);
   const history=(submissions||[]).map(x=>'<p class="catalog-status">Solicitud '+esc(x.status==='pending'?'pendiente':x.status==='approved'?'aprobada':'observada')+' · '+new Date(x.created_at).toLocaleDateString('es-AR')+(x.review_note?' · '+esc(x.review_note):'')+'</p>').join('');
@@ -255,6 +288,7 @@ async function renderMerchantProfile(userId){
     '<div class="form-field"><label for="merchantPublicName">Nombre del comercio</label><input id="merchantPublicName" maxlength="120" value="'+esc(p?.nombre||'')+'"></div>'+
     '<div class="form-field"><label for="merchantPublicCategory">Rubro</label><input id="merchantPublicCategory" maxlength="80" value="'+esc(p?.rubro||'')+'"></div>'+
     '<div class="form-field"><label for="merchantPublicZone">Zona / barrio</label><input id="merchantPublicZone" maxlength="120" value="'+esc(p?.zona||'')+'"></div>'+
+    '<div class="form-field"><label for="merchantPublicWhatsapp">WhatsApp del comercio</label><input id="merchantPublicWhatsapp" maxlength="40" value="'+esc(p?.whatsapp||'')+'"></div>'+
     '<div class="form-field"><label for="merchantPublicImage">URL de foto del comercio</label><input id="merchantPublicImage" type="url" maxlength="1000" value="'+esc(p?.store_image_url||'')+'" placeholder="https://..."></div>'+
     '<button class="primary" type="button" onclick="submitMerchantProfile()">Enviar cambios a aprobación</button>'+history+'<p id="merchantProfileNote" class="catalog-status" role="status"></p></section>';
 }
@@ -265,6 +299,7 @@ async function submitMerchantProfile(){
     nombre:document.getElementById('merchantPublicName')?.value.trim(),
     rubro:document.getElementById('merchantPublicCategory')?.value.trim(),
     zona:document.getElementById('merchantPublicZone')?.value.trim(),
+    whatsapp:document.getElementById('merchantPublicWhatsapp')?.value.trim(),
     store_image_url:document.getElementById('merchantPublicImage')?.value.trim()
   };
   const note=document.getElementById('merchantProfileNote');

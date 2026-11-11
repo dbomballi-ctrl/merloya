@@ -124,7 +124,7 @@ function captureDeliveryLocation(){
   note.textContent='Solicitando permiso de ubicación…';
   navigator.geolocation.getCurrentPosition(pos=>{deliveryCoords={lat:pos.coords.latitude,lon:pos.coords.longitude};note.textContent='Ubicación obtenida correctamente.'},err=>{note.textContent=err.code===1?'Permiso de ubicación denegado.':'No se pudo obtener la ubicación. Revisá GPS y permisos.'},{enableHighAccuracy:true,timeout:15000,maximumAge:60000});
 }
-async function showAccount(){
+async async function showAccount(){
   const db=window.merloDb;
   if(!db){alert('No se pudo conectar con el servicio.');return}
   document.getElementById('cartLines').innerHTML='<h3>Mi cuenta</h3><p class="notice">Ingresá para consultar tus pedidos o administrar transferencias.</p>'+

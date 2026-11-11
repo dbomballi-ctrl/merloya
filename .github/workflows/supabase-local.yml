@@ -30,7 +30,14 @@ jobs:
           version: latest
 
       - name: Start isolated Supabase stack
-        run: supabase start -x studio,edge-runtime,logflare,vector,imgproxy,inbucket
+        run: |
+          set -euo pipefail
+          # Prevent the CLI from applying project migrations before the legacy fixture exists.
+          mv supabase/migrations /tmp/merlo-migrations
+          mkdir -p supabase/migrations
+          supabase start -x studio,edge-runtime,logflare,vector,imgproxy,inbucket
+          rmdir supabase/migrations
+          mv /tmp/merlo-migrations supabase/migrations
 
       - name: Install PostgreSQL client
         run: |

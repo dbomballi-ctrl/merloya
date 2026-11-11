@@ -12,6 +12,26 @@ create table public.profiles (
 );
 alter table public.profiles enable row level security;
 
+-- Seed the demo merchant identity expected by the demo catalog migration.
+insert into auth.users (
+  id, aud, role, email, encrypted_password, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at
+) values (
+  'b599b569-2cf5-4f1d-aa4a-ebe369ff57d8',
+  'authenticated', 'authenticated', 'demo-merchant@merloya.test', '',
+  now(), '{}'::jsonb, '{}'::jsonb, now(), now()
+) on conflict (id) do nothing;
+
+insert into public.profiles (id, nombre, domicilio, zona, rubro, role)
+values (
+  'b599b569-2cf5-4f1d-aa4a-ebe369ff57d8',
+  'Almacén El Colibrí · DEMO',
+  'Av. Del Sol de Prueba',
+  'Centro · Villa de Merlo',
+  'Almacenes',
+  'comercio'
+) on conflict (id) do nothing;
+
 create table public.products (
   id uuid primary key default gen_random_uuid(),
   comercio_id uuid references public.profiles(id),

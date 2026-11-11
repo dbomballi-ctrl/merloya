@@ -39,7 +39,7 @@ jobs:
 
       - name: Bootstrap legacy schema fixture
         run: |
-          PGPASSWORD=postgres psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \\
+          PGPASSWORD=postgres psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
             -v ON_ERROR_STOP=1 -f supabase/tests/fixtures/legacy_schema.sql
 
       - name: Apply all migrations in order
@@ -47,12 +47,12 @@ jobs:
           set -euo pipefail
           for migration in supabase/migrations/*.sql; do
             echo "::group::Applying ${migration}"
-            PGPASSWORD=postgres psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \\
+            PGPASSWORD=postgres psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
               -v ON_ERROR_STOP=1 -f "${migration}"
             echo "::endgroup::"
           done
 
       - name: Assert schema and security invariants
         run: |
-          PGPASSWORD=postgres psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \\
+          PGPASSWORD=postgres psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
             -v ON_ERROR_STOP=1 -f supabase/tests/assertions.sql

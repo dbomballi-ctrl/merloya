@@ -50,7 +50,7 @@ Deno.serve(async (req) => {
           publication_status: "approved",
         };
         if (allowed.store_image_url && !String(allowed.store_image_url).startsWith("https://")) return json({ error: "La imagen debe usar HTTPS." }, 400);
-        if (!allowed.nombre || !allowed.rubro) return json({ error: "La solicitud no contiene nombre y rubro válidos." }, 400);
+        if (!allowed.nombre || !allowed.rubro || !allowed.domicilio) return json({ error: "La solicitud debe incluir nombre, rubro y dirección para retiro." }, 400);
         if (p.requested_role === "comercio") allowed.role = "comercio";
         const { error: profileError } = await db.from("profiles").update(allowed).eq("id", submission.merchant_id);
         if (profileError) throw profileError;

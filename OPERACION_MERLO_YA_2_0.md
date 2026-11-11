@@ -80,6 +80,7 @@ El proyecto conectado registra las siguientes migraciones operativas:
 - `grant_authenticated_public_merchant_fields`
 - `revoke_anon_private_table_access`
 - `add_free_pickup_fulfillment`
+- `restore_public_merchant_profile_columns`
 
 El repositorio conserva además `202611080002_transferencias_multiproveedor.sql` como base histórica para reproducir el esquema desde el fixture local. No se debe volver a aplicar manualmente en el proyecto conectado sin verificar primero el historial de migraciones.
 

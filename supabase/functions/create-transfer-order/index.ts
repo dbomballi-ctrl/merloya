@@ -93,8 +93,8 @@ Deno.serve(async (req) => {
         db.from("profiles").select("id,nombre,domicilio,zona,latitude,longitude,role,is_demo").eq("id", merchantId).single(),
         db.from("merchant_payment_accounts").select("account_holder,bank_name,cbu,alias").eq("merchant_id", merchantId).maybeSingle(),
       ]);
-      if (!merchant || merchant.role !== "comercio") {
-        return json({ error: "No se pudo validar uno de los comercios." }, 409);
+      if (!merchant || merchant.role !== "comercio" || merchant.publication_status !== "approved") {
+        return json({ error: "Uno de los comercios no está disponible para recibir pedidos." }, 409);
       }
       if (fulfillmentType === "delivery" && (
           merchant.latitude === null || merchant.latitude === undefined ||

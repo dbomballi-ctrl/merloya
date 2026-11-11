@@ -411,9 +411,10 @@ async function accountLogout(){
 }
 function renderOrderReceipt(data){
   const payments=data.payments||[];
-  const whatsapp=data.whatsapp_notification==='sent'
-    ? 'WhatsApp enviado al número de Merlo Ya.'
-    : data.whatsapp_notification==='skipped_duplicate' ? 'Aviso de WhatsApp omitido por reintento duplicado.' : 'Pedido guardado; no se pudo confirmar el envío de WhatsApp.';
+  const whatsappUrl = /^https:\/\/wa\.me\/5491126306785\?text=/.test(data.whatsapp_url||'') ? data.whatsapp_url : '';
+  const whatsappAction = whatsappUrl
+    ? '<a class="primary" style="display:block;text-align:center;text-decoration:none;margin-top:14px" href="'+esc(whatsappUrl)+'" target="_blank" rel="noopener noreferrer">Avisar a Merlo Ya por WhatsApp</a><p class="notice">Se abrirá WhatsApp con el detalle del pedido. Tocá Enviar para confirmar el aviso.</p>'
+    : '<p class="notice">Pedido guardado. No se pudo generar el enlace de WhatsApp.</p>';
   const paymentContent=data.demo_mode
     ? '<p class="notice"><b>Modo demostración.</b> Esta compra es de prueba: no transfieras dinero ni adjuntes comprobantes.</p>'
     : payments.map(p=>'<div class="cart-line" style="display:block"><b>'+(p.payee_type==='merchant'?'Transferencia al comercio':'Envío · Merlo Ya')+'</b>'+
@@ -425,7 +426,7 @@ function renderOrderReceipt(data){
       '<button class="pill" type="button" data-proof="'+esc(p.id)+'">Subir comprobante</button>'+
       '<span class="notice" id="proof-status-'+esc(p.id)+'">'+(p.status==='proof_submitted'?'Comprobante recibido': 'Pendiente de transferencia')+'</span></div>').join('')+
       '<p class="notice">Transferí cada importe por separado y adjuntá el comprobante correspondiente. El pedido queda sujeto a revisión.</p>';
-  document.getElementById('cartLines').innerHTML='<h3>'+(data.demo_mode?'Pedido de prueba creado':'Pedido creado')+'</h3><p class="notice">Número de pedido: '+esc(data.order_id)+'</p>'+paymentContent+'<p class="notice">'+esc(whatsapp)+'</p>';
+  document.getElementById('cartLines').innerHTML='<h3>'+(data.demo_mode?'Pedido de prueba creado':'Pedido creado')+'</h3><p class="notice">Número de pedido: '+esc(data.order_id)+'</p>'+paymentContent+whatsappAction;
   document.querySelectorAll('[data-proof]').forEach(btn=>btn.addEventListener('click',()=>uploadPaymentProof(btn.dataset.proof,btn)));
   document.getElementById('cartBottom').innerHTML='<button class="primary" type="button" onclick="closeCart()">Cerrar</button>';
 }

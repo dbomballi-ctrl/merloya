@@ -280,15 +280,16 @@ async function submitMerchantRequest(){
 async function renderMerchantProfile(userId){
   const db=window.merloDb;
   const [{data:p},{data:submissions}]=await Promise.all([
-    db.from('profiles').select('nombre,rubro,zona,store_image_url,whatsapp').eq('id',userId).single(),
-    db.from('merchant_profile_submissions').select('status,created_at,review_note').eq('merchant_id',userId).order('created_at',{ascending:false}).limit(3)
+    db.from('profiles').select('nombre,rubro,zona,store_image_url').eq('id',userId).single(),
+    db.from('merchant_profile_submissions').select('status,created_at,review_note,proposed_data').eq('merchant_id',userId).order('created_at',{ascending:false}).limit(10)
   ]);
+  const approvedWhatsapp=(submissions||[]).find(x=>x.status==='approved'&&x.proposed_data?.whatsapp)?.proposed_data.whatsapp||'';
   const history=(submissions||[]).map(x=>'<p class="catalog-status">Solicitud '+esc(x.status==='pending'?'pendiente':x.status==='approved'?'aprobada':'observada')+' · '+new Date(x.created_at).toLocaleDateString('es-AR')+(x.review_note?' · '+esc(x.review_note):'')+'</p>').join('');
   return '<section class="catalog-manager"><h3>Datos de mi comercio</h3><p class="notice">Los cambios de nombre, rubro, zona e imagen quedan pendientes hasta que Merlo Ya los apruebe.</p>'+
     '<div class="form-field"><label for="merchantPublicName">Nombre del comercio</label><input id="merchantPublicName" maxlength="120" value="'+esc(p?.nombre||'')+'"></div>'+
     '<div class="form-field"><label for="merchantPublicCategory">Rubro</label><input id="merchantPublicCategory" maxlength="80" value="'+esc(p?.rubro||'')+'"></div>'+
     '<div class="form-field"><label for="merchantPublicZone">Zona / barrio</label><input id="merchantPublicZone" maxlength="120" value="'+esc(p?.zona||'')+'"></div>'+
-    '<div class="form-field"><label for="merchantPublicWhatsapp">WhatsApp del comercio</label><input id="merchantPublicWhatsapp" maxlength="40" value="'+esc(p?.whatsapp||'')+'"></div>'+
+    '<div class="form-field"><label for="merchantPublicWhatsapp">WhatsApp del comercio</label><input id="merchantPublicWhatsapp" maxlength="40" value="'+esc(approvedWhatsapp)+'"></div>'+
     '<div class="form-field"><label for="merchantPublicImage">URL de foto del comercio</label><input id="merchantPublicImage" type="url" maxlength="1000" value="'+esc(p?.store_image_url||'')+'" placeholder="https://..."></div>'+
     '<button class="primary" type="button" onclick="submitMerchantProfile()">Enviar cambios a aprobación</button>'+history+'<p id="merchantProfileNote" class="catalog-status" role="status"></p></section>';
 }

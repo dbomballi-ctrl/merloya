@@ -90,7 +90,7 @@ Deno.serve(async (req) => {
     const merchantData = new Map<string, any>();
     for (const merchantId of grouped.keys()) {
       const [{ data: merchant }, { data: bank }] = await Promise.all([
-        db.from("profiles").select("id,nombre,domicilio,zona,latitude,longitude,role,is_demo").eq("id", merchantId).single(),
+        db.from("profiles").select("id,nombre,domicilio,zona,latitude,longitude,role,is_demo,publication_status").eq("id", merchantId).single(),
         db.from("merchant_payment_accounts").select("account_holder,bank_name,cbu,alias").eq("merchant_id", merchantId).maybeSingle(),
       ]);
       if (!merchant || merchant.role !== "comercio" || merchant.publication_status !== "approved") {

@@ -45,6 +45,16 @@ begin
     raise exception 'legacy sales grants are too broad';
   end if;
 
+  if has_table_privilege('anon','public.orders','SELECT')
+     or has_table_privilege('anon','public.merchant_orders','SELECT')
+     or has_table_privilege('anon','public.transfer_payments','SELECT')
+     or has_table_privilege('anon','public.payment_proofs','SELECT')
+     or has_table_privilege('anon','public.merchant_payment_accounts','SELECT')
+     or has_table_privilege('anon','public.platform_settings','SELECT')
+     or has_table_privilege('anon','public.delivery_assignments','SELECT') then
+    raise exception 'anon unexpectedly has access to private commerce tables';
+  end if;
+
   if has_function_privilege('authenticated',
        'public.create_merlo_transfer_order(uuid,text,jsonb,jsonb,jsonb,jsonb)','EXECUTE') then
     raise exception 'authenticated can execute privileged checkout RPC';

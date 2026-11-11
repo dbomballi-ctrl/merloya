@@ -29,16 +29,25 @@ Deno.serve(async (req) => {
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(idempotencyKey)) {
       return json({ error: "La clave de pedido no es válida. Recargá el checkout e intentá nuevamente." }, 400);
     }
-    const address = String(body.delivery_address ?? "").trim();
+    const fulfillmentType = String(body.fulfillment_type ?? "delivery");
+    if (!["delivery", "pickup"].includes(fulfillmentType)) {
+      return json({ error: "Modalidad de entrega inválida." }, 400);
+    }
+    const address = fulfillmentType === "pickup"
+      ? "Retiro en comercio"
+      : String(body.delivery_address ?? "").trim();
     const zone = String(body.delivery_zone ?? "").trim();
     const phone = String(body.customer_phone ?? "").trim();
-    const lat = Number(body.delivery_latitude);
-    const lon = Number(body.delivery_longitude);
+    const lat = body.delivery_latitude == null ? null : Number(body.delivery_latitude);
+    const lon = body.delivery_longitude == null ? null : Number(body.delivery_longitude);
     const items: Array<{ product_id: string; quantity: number }> = body.items ?? [];
-    if (!address || !Number.isFinite(lat) || !Number.isFinite(lon) ||
-        lat < -90 || lat > 90 || lon < -180 || lon > 180 ||
-        !Array.isArray(items) || items.length < 1 || items.length > 80) {
-      return json({ error: "Dirección, ubicación y productos son obligatorios." }, 400);
+    const invalidDeliveryLocation = fulfillmentType === "delivery" &&
+      (!address || lat === null || lon === null || !Number.isFinite(lat) || !Number.isFinite(lon) ||
+       lat < -90 || lat > 90 || lon < -180 || lon > 180);
+    if (invalidDeliveryLocation || !Array.isArray(items) || items.length < 1 || items.length > 80) {
+      return json({ error: fulfillmentType === "delivery"
+        ? "Dirección, ubicación y productos son obligatorios."
+        : "El carrito no contiene productos válidos." }, 400);
     }
     if (items.some(x => !x.product_id || !Number.isInteger(x.quantity) || x.quantity < 1 || x.quantity > 99)) {
       return json({ error: "Hay productos o cantidades inválidas." }, 400);
@@ -62,27 +71,39 @@ Deno.serve(async (req) => {
       grouped.set(product.comercio_id, group);
     }
 
-    const { data: rates, error: rateError } = await db.from("delivery_rate_tiers")
-      .select("id,label,min_km,max_km,fee").eq("active", true).order("sort_order");
-    if (rateError || !rates?.length) return json({ error: "Merlo Ya todavía no configuró las tarifas de envío." }, 409);
+    let rates: any[] = [];
+    let platformAccount: any = null;
+    if (fulfillmentType === "delivery") {
+      const { data, error: rateError } = await db.from("delivery_rate_tiers")
+        .select("id,label,min_km,max_km,fee").eq("active", true).order("sort_order");
+      if (rateError || !data?.length) return json({ error: "Merlo Ya todavía no configuró las tarifas de envío." }, 409);
+      rates = data;
 
-    const { data: platformAccount } = await db.from("platform_settings")
-      .select("account_holder,bank_name,cbu,alias").eq("id", true).maybeSingle();
-    if (!platformAccount || (!platformAccount.cbu && !platformAccount.alias)) {
-      return json({ error: "Merlo Ya todavía no configuró su cuenta bancaria." }, 409);
+      const { data: account } = await db.from("platform_settings")
+        .select("account_holder,bank_name,cbu,alias").eq("id", true).maybeSingle();
+      if (!account || (!account.cbu && !account.alias)) {
+        return json({ error: "Merlo Ya todavía no configuró su cuenta bancaria." }, 409);
+      }
+      platformAccount = account;
     }
 
     const merchantData = new Map<string, any>();
     for (const merchantId of grouped.keys()) {
       const [{ data: merchant }, { data: bank }] = await Promise.all([
-        db.from("profiles").select("id,nombre,latitude,longitude,role,is_demo").eq("id", merchantId).single(),
+        db.from("profiles").select("id,nombre,domicilio,zona,latitude,longitude,role,is_demo").eq("id", merchantId).single(),
         db.from("merchant_payment_accounts").select("account_holder,bank_name,cbu,alias").eq("merchant_id", merchantId).maybeSingle(),
       ]);
-      if (!merchant || merchant.role !== "comercio" ||
+      if (!merchant || merchant.role !== "comercio") {
+        return json({ error: "No se pudo validar uno de los comercios." }, 409);
+      }
+      if (fulfillmentType === "delivery" && (
           merchant.latitude === null || merchant.latitude === undefined ||
           merchant.longitude === null || merchant.longitude === undefined ||
-          !Number.isFinite(Number(merchant.latitude)) || !Number.isFinite(Number(merchant.longitude))) {
-        return json({ error: `El comercio ${merchant?.nombre ?? ""} todavía no tiene ubicación cargada.` }, 409);
+          !Number.isFinite(Number(merchant.latitude)) || !Number.isFinite(Number(merchant.longitude)))) {
+        return json({ error: `El comercio ${merchant.nombre} todavía no tiene ubicación cargada.` }, 409);
+      }
+      if (fulfillmentType === "pickup" && !String(merchant.domicilio ?? merchant.zona ?? "").trim()) {
+        return json({ error: `El comercio ${merchant.nombre} todavía no informó dónde retirar.` }, 409);
       }
       if (!bank || (!bank.cbu && !bank.alias)) {
         return json({ error: `El comercio ${merchant.nombre} todavía no configuró su cuenta para transferencias.` }, 409);
@@ -98,20 +119,23 @@ Deno.serve(async (req) => {
     let subtotalTotal = 0, shippingTotal = 0;
     for (const [merchantId, lines] of grouped.entries()) {
       const { merchant, bank } = merchantData.get(merchantId);
-      const routeUrl = `${routeBase}/route/v1/driving/${Number(merchant.longitude)},${Number(merchant.latitude)};${lon},${lat}?overview=false`;
-      const routeResponse = await fetch(routeUrl);
-      if (!routeResponse.ok) return json({ error: "No se pudo calcular el recorrido de uno de los comercios." }, 502);
-      const route = await routeResponse.json();
-      if (route.code !== "Ok" || !route.routes?.[0]) return json({ error: `No hay recorrido disponible desde ${merchant.nombre}.` }, 422);
-      const km = Number(route.routes[0].distance) / 1000;
-      const tier = rates.find(r => km >= Number(r.min_km) && (r.max_km === null || km <= Number(r.max_km)));
-      if (!tier) return json({ error: `No hay tarifa configurada para ${km.toFixed(1)} km.` }, 409);
+      let km = 0;
+      let tier: any = null;
+      let shipping = 0;
+      if (fulfillmentType === "delivery") {
+        const routeUrl = `${routeBase}/route/v1/driving/${Number(merchant.longitude)},${Number(merchant.latitude)};${lon},${lat}?overview=false`;
+        const routeResponse = await fetch(routeUrl);
+        if (!routeResponse.ok) return json({ error: "No se pudo calcular el recorrido de uno de los comercios." }, 502);
+        const route = await routeResponse.json();
+        if (route.code !== "Ok" || !route.routes?.[0]) return json({ error: `No hay recorrido disponible desde ${merchant.nombre}.` }, 422);
+        km = Number(route.routes[0].distance) / 1000;
+        tier = rates.find(r => km >= Number(r.min_km) && (r.max_km === null || km <= Number(r.max_km)));
+        if (!tier) return json({ error: `No hay tarifa configurada para ${km.toFixed(1)} km.` }, 409);
+        shipping = Number(tier.fee);
+      }
       const subtotal = lines.reduce((sum, x) => sum + Number(x.product.precio) * x.quantity, 0);
-      subtotalTotal += subtotal; shippingTotal += Number(tier.fee);
-      calculated.push({
-        merchantId, merchant, bank, lines, subtotal, km, tier,
-        shipping: Number(tier.fee),
-      });
+      subtotalTotal += subtotal; shippingTotal += shipping;
+      calculated.push({ merchantId, merchant, bank, lines, subtotal, km, tier, shipping });
     }
 
     const total = subtotalTotal + shippingTotal;
@@ -124,7 +148,10 @@ Deno.serve(async (req) => {
       merchantOrderRows.push({
         id: merchantOrderId, merchant_id: part.merchantId, subtotal: part.subtotal,
         route_distance_km: part.km, shipping_fee: part.shipping,
-        delivery_rate_tier_id: part.tier.id, delivery_address_snapshot: address,
+        delivery_rate_tier_id: part.tier?.id ?? null,
+        delivery_address_snapshot: fulfillmentType === "pickup"
+          ? String(part.merchant.domicilio ?? part.merchant.zona ?? "").trim()
+          : address,
         merchant_name_snapshot: part.merchant.nombre,
       });
       for (const x of part.lines) {
@@ -147,12 +174,16 @@ Deno.serve(async (req) => {
       summaries.push({
         merchant_order_id: merchantOrderId, merchant: part.merchant.nombre,
         subtotal: part.subtotal, route_distance_km: Number(part.km.toFixed(2)),
-        shipping: part.shipping, rate: part.tier.label,
+        shipping: part.shipping, rate: part.tier?.label ?? "Retiro gratuito",
+        pickup_address: fulfillmentType === "pickup"
+          ? String(part.merchant.domicilio ?? part.merchant.zona ?? "").trim()
+          : null,
       });
     }
 
     const fingerprintPayload = {
-      customer_id: user.id, delivery_address: address, delivery_zone: zone || null,
+      customer_id: user.id, fulfillment_type: fulfillmentType,
+      delivery_address: address, delivery_zone: zone || null,
       customer_phone: phone || null, delivery_latitude: lat, delivery_longitude: lon,
       items: items.map(x => ({ product_id: x.product_id, quantity: x.quantity }))
         .sort((a, b) => a.product_id.localeCompare(b.product_id)),
@@ -167,7 +198,8 @@ Deno.serve(async (req) => {
       p_idempotency_key: idempotencyKey,
       p_request_fingerprint: requestFingerprint,
       p_order: {
-        customer_id: user.id, delivery_address: address, delivery_zone: zone || null,
+        customer_id: user.id, fulfillment_type: fulfillmentType,
+        delivery_address: address, delivery_zone: zone || null,
         delivery_latitude: lat, delivery_longitude: lon, customer_phone: phone || null,
         subtotal: subtotalTotal, shipping_total: shippingTotal, total_amount: total,
         status: demoMode ? "confirmed" : "awaiting_transfers",
@@ -191,11 +223,15 @@ Deno.serve(async (req) => {
     if (paymentError) throw paymentError;
 
     // WhatsApp se abre mediante un enlace wa.me: el cliente confirma el envío manualmente.
+    const pickupDetails = fulfillmentType === "pickup"
+      ? calculated.map(part => `• ${part.merchant.nombre}: ${part.merchant.domicilio || part.merchant.zona || "Dirección a coordinar"}`).join("\n")
+      : "";
     const whatsappMessage =
       `🛒 NUEVO PEDIDO - MERLO YA\n\n` +
       `📦 Pedido: ${orderId}\n` +
-      `💰 Total: $${total.toFixed(2)}\n` +
-      `📍 Dirección: ${address}\n` +
+      `💰 Total: ${total.toFixed(2)}\n` +
+      `🚚 Modalidad: ${fulfillmentType === "pickup" ? "Retiro gratuito en comercio" : "Delivery Merlo Ya"}\n` +
+      (fulfillmentType === "pickup" ? `🏪 Retirar en:\n${pickupDetails}\n` : `📍 Dirección: ${address}\n`) +
       `📱 Cliente: ${phone || "No informado"}\n` +
       (demoMode ? `🧪 PEDIDO DE PRUEBA - no transferir dinero` : `💳 Estado: Esperando transferencias`);
     const whatsappUrl = `https://wa.me/5491126306785?text=${encodeURIComponent(whatsappMessage)}`;

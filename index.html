@@ -306,7 +306,7 @@ async function submitMerchantRequest(){
     requested_role:'comercio'
   };
   const note=document.getElementById('merchantRequestNote');
-  if(!proposed_data.nombre||!proposed_data.rubro){note.textContent='Completá nombre y rubro.';return}
+  if(!proposed_data.nombre||!proposed_data.rubro||!proposed_data.domicilio){note.textContent='Completá nombre, rubro y dirección para retiro.';return}
   if(proposed_data.store_image_url&&!/^https:\/\//i.test(proposed_data.store_image_url)){note.textContent='La foto debe usar HTTPS.';return}
   const {error}=await db.from('merchant_profile_submissions').insert({merchant_id:user.id,proposed_data});
   if(error){note.textContent='No se pudo enviar: '+error.message;return}

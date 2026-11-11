@@ -238,6 +238,7 @@ Deno.serve(async (req) => {
 
 return json({
   order_id: orderId,
+  fulfillment_type: fulfillmentType,
   subtotal: subtotalTotal,
   shipping_total: shippingTotal,
   total,

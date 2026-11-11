@@ -15,6 +15,21 @@ begin
   if to_regclass('public.public_merchants') is null then
     raise exception 'Missing public_merchants view';
   end if;
+  if not exists (
+    select 1 from information_schema.columns
+    where table_schema='public' and table_name='orders'
+      and column_name='fulfillment_type'
+  ) then
+    raise exception 'orders.fulfillment_type is missing';
+  end if;
+  if not exists (
+    select 1 from pg_constraint
+    where conrelid='public.orders'::regclass
+      and conname='orders_fulfillment_type_check'
+      and position('pickup' in pg_get_constraintdef(oid)) > 0
+  ) then
+    raise exception 'orders does not allow pickup fulfillment';
+  end if;
   select reloptions into v_options from pg_class where oid='public.public_merchants'::regclass;
   if not coalesce(v_options @> array['security_invoker=true'], false) then
     raise exception 'public_merchants must use security_invoker=true';

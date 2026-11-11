@@ -3,10 +3,16 @@ name: Supabase local migration tests
 on:
   pull_request:
     branches: [main]
+    paths:
+      - "supabase/migrations/**"
+      - "supabase/tests/**"
+      - ".github/workflows/supabase-local.yml"
   push:
-    branches:
-      - merlo-ya-2.0-dev
-      - merlo-ya-2.0-preview
+    branches: [merlo-ya-2.0-frontend-rebuild]
+    paths:
+      - "supabase/migrations/**"
+      - "supabase/tests/**"
+      - ".github/workflows/supabase-local.yml"
   workflow_dispatch:
 
 permissions:
@@ -32,27 +38,21 @@ jobs:
           sudo apt-get install --yes postgresql-client
 
       - name: Bootstrap legacy schema fixture
-        env:
-          PGPASSWORD: postgres
         run: |
-          psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
+          PGPASSWORD=postgres psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \\
             -v ON_ERROR_STOP=1 -f supabase/tests/fixtures/legacy_schema.sql
 
       - name: Apply all migrations in order
-        env:
-          PGPASSWORD: postgres
         run: |
           set -euo pipefail
           for migration in supabase/migrations/*.sql; do
             echo "::group::Applying ${migration}"
-            psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
+            PGPASSWORD=postgres psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \\
               -v ON_ERROR_STOP=1 -f "${migration}"
             echo "::endgroup::"
           done
 
       - name: Assert schema and security invariants
-        env:
-          PGPASSWORD: postgres
         run: |
-          psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
+          PGPASSWORD=postgres psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \\
             -v ON_ERROR_STOP=1 -f supabase/tests/assertions.sql

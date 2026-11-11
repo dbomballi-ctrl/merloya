@@ -1,92 +1,113 @@
 # Merlo Ya 2.0 — Operación y puesta en marcha
 
-Este documento describe el circuito implementado en `merlo-ya-2.0-dev` y lo que falta para habilitarlo. **Los cambios de código no implican que Supabase o Vercel ya estén desplegados.**
+## Estado actual
 
-## Flujo de pedidos
+- Rama de trabajo: `merlo-ya-2.0-frontend-rebuild`.
+- PR de integración: https://github.com/dbomballi-ctrl/merloya/pull/3 (draft; no fusionado).
+- El proyecto Supabase conectado ya tiene las migraciones operativas y las Edge Functions desplegadas.
+- El frontend se publica como Preview en Vercel. El plan Free alcanzó el límite de 100 despliegues diarios; el último Preview READY corresponde al commit `c1b77cd`, mientras que la rama tiene cambios posteriores aún no publicados.
+- No se modificó `main` ni se hizo un despliegue de producción.
 
-1. El cliente inicia sesión y envía carrito, dirección y coordenadas.
-2. `create-transfer-order` valida la sesión, el perfil, los productos, los comercios, las cuentas de destino y la tarifa de delivery.
-3. La Edge Function calcula los importes desde los datos de Supabase; no confía en precios ni totales enviados por el navegador.
-4. Una RPC crea el pedido, subpedidos, ítems y obligaciones de transferencia dentro de una sola transacción.
-5. La clave `Idempotency-Key` identifica el intento. Un reintento con la misma clave y los mismos datos recupera el pedido; la misma clave con datos distintos se rechaza.
-6. El cliente transfiere por separado a cada destino y adjunta el comprobante privado.
-7. El comercio revisa únicamente la transferencia destinada a ese comercio. Administración puede revisar también la transferencia de delivery.
-8. La revisión actualiza el pago y los estados derivados del pedido mediante el trigger de base de datos.
+## Funcionalidad
 
-## Migraciones SQL
+### Cliente
+- Catálogo público de comercios y productos aprobados.
+- Registro, inicio de sesión, carrito e historial de pedidos.
+- Checkout multicomercio.
+- Modalidad `delivery`: dirección, zona y ubicación GPS; el backend calcula el recorrido y la tarifa.
+- Modalidad `pickup`: retiro gratuito en cada comercio; no solicita dirección del cliente ni GPS y guarda la dirección de retiro de cada local.
+- Transferencias bancarias manuales y carga privada de comprobantes.
+- Seguimiento de entrega cuando el pedido es delivery.
 
-Aplicar en orden, primero en un proyecto Supabase de staging:
+### Comercio
+- Solicitud de alta y edición de perfil con revisión de administración.
+- La dirección del local es obligatoria para aprobar el perfil y habilitar retiro gratuito.
+- Gestión de productos y moderación de publicaciones.
+- Consulta de pedidos y revisión de comprobantes destinados al propio comercio.
 
-1. `202611080002_transferencias_multiproveedor.sql`
-2. `20261110132000_atomic_transfer_order_creation.sql`
-3. `20261110140000_checkout_idempotency.sql`
-4. `20261110150000_atomic_payment_proof_submission.sql`
-5. `20261110160000_atomic_payment_review.sql`
-6. `20261110170000_profile_signup_trigger.sql`
-7. `20261110180000_delivery_assignments.sql`
-8. `20261110190000_security_hardening.sql`
+### Administración
+- Revisión de perfiles, comercios y productos.
+- Configuración de cuenta de cobro de Merlo Ya y tarifas de delivery.
+- Habilitación/deshabilitación de cuentas de repartidor.
+- Asignación manual de pedidos delivery confirmados.
+- Revisión de pagos de comercio y de delivery.
 
-Las migraciones deben ejecutarse una sola vez por entorno y verificarse contra el esquema real antes de producción. No ejecutar manualmente solo una migración posterior: las RPC dependen de las tablas creadas por la primera.
+### Repartidor
+- Consulta de entregas asignadas.
+- Estados secuenciales: asignado → retirado del comercio → entregado.
+- No hay seguimiento GPS en tiempo real.
 
-## Edge Functions
+## Flujo de checkout
 
-Desplegar estas funciones desde el proyecto Supabase correcto:
+1. El navegador envía IDs de producto, cantidades, modalidad y datos de entrega cuando corresponde.
+2. `create-transfer-order` valida sesión, rol, publicación, precio y comercio desde Supabase. No confía en precios ni totales del navegador.
+3. En delivery, valida ubicación del comercio y cliente, calcula la ruta y selecciona una tarifa activa.
+4. En pickup, exige dirección del comercio, fija envío en ARS 0 y no crea una obligación de pago a Merlo Ya por delivery.
+5. Una RPC crea pedido, subpedidos, ítems y transferencias en una transacción.
+6. La clave de idempotencia evita duplicados ante reintentos.
+7. El cliente transfiere manualmente y adjunta comprobantes privados.
+8. Comercio y administración revisan los pagos según el destinatario.
+9. El pedido queda confirmado cuando todos los pagos requeridos están verificados.
+10. Para ambos modos se genera un enlace `wa.me` dirigido exclusivamente a Merlo Ya (`5491126306785`). WhatsApp abre con el texto preparado; el cliente debe tocar Enviar. No hay envío automático.
+
+## Edge Functions desplegadas
 
 - `create-transfer-order`
 - `submit-transfer-proof`
 - `review-transfer-payment`
-- `manage-platform-settings` (solo administración)
-- `manage-delivery-assignment` (administración y repartidores autenticados)
+- `review-merchant-catalog`
+- `manage-platform-settings`
+- `manage-delivery-assignment`
+- `manage-courier-profiles`
+- `super-service`
 
-Variables requeridas en el entorno de Edge Functions:
+Las funciones operativas requieren JWT y validan el rol en servidor. La clave `SUPABASE_SERVICE_ROLE_KEY` solo existe en el runtime de Edge Functions y nunca debe incluirse en el frontend.
 
-- `SUPABASE_URL`
-- `SUPABASE_ANON_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY` (solo como secret del runtime; nunca en el frontend)
+## Migraciones
 
-Variables opcionales:
+El proyecto conectado registra las siguientes migraciones operativas:
+- `20261110132000_atomic_transfer_order_creation`
+- `20261110140000_checkout_idempotency`
+- `20261110150000_atomic_payment_proof_submission`
+- `20261110160000_atomic_payment_review`
+- `20261110170000_profile_signup_trigger`
+- `20261110180000_delivery_assignments`
+- `20261110190000_security_hardening`
+- `20261110200000_demo_catalog_media_and_moderation`
+- `20261110210000_demo_checkout_without_real_transfers`
+- `20261110220000_merchant_onboarding_requests`
+- `restrict_public_merchant_view_access`
+- `grant_authenticated_public_merchant_fields`
+- `revoke_anon_private_table_access`
+- `add_free_pickup_fulfillment`
 
-- `APP_ORIGIN`: origen web permitido para CORS.
-- `ROUTING_BASE_URL`: endpoint compatible con OSRM. Si se omite, se usa el servicio público de demostración; no ofrece SLA para producción.
+El repositorio conserva además `202611080002_transferencias_multiproveedor.sql` como base histórica para reproducir el esquema desde el fixture local. No se debe volver a aplicar manualmente en el proyecto conectado sin verificar primero el historial de migraciones.
 
-## Configuración operativa necesaria
+## Seguridad y CI
 
-Antes de una prueba end-to-end deben configurarse en staging:
+- RLS está habilitado en las tablas operativas.
+- El rol `anon` conserva lectura solo del catálogo público; se revocó su acceso a tablas privadas de pedidos, pagos, cuentas y perfiles.
+- `public_merchants` usa `security_invoker` y solo expone comercios aprobados, incluida su dirección comercial de retiro.
+- La RPC privilegiada de checkout solo puede ejecutarse con `service_role`.
+- El chequeo de Deno y la validación de sintaxis JavaScript/IDs HTML pasaron en GitHub Actions.
+- La prueba local de migraciones detectó inicialmente que Supabase CLI aplicaba migraciones antes del fixture; se corrigió el workflow para iniciar el stack vacío, cargar el fixture y luego aplicar las migraciones. La nueva ejecución está pendiente de resultado.
 
-- Cuenta bancaria/CBU/alias de Merlo Ya en `platform_settings` (desde el panel de administración).
-- Cuenta de transferencia y coordenadas de cada comercio en `merchant_payment_accounts` y `profiles`.
-- Tarifas reales de delivery en `delivery_rate_tiers`. Los valores iniciales de la migración son demostrativos y no deben usarse como tarifas comerciales sin aprobación. Los tramos usan límites `[min_km, max_km)`, deben ser contiguos, empezar en 0 km y el último debe tener límite superior abierto.
-- Dominio de Vercel como `APP_ORIGIN`.
-- Políticas de autenticación, confirmación de email y URL de redirección de Supabase.
-- Un cliente, un comercio y un usuario administrador de prueba.
+## Configuración necesaria antes de abrir al público
 
-## Pruebas de aceptación en staging
+1. Reemplazar datos demostrativos por comercios reales aprobados.
+2. Cada comercio debe cargar dirección de retiro, coordenadas y cuenta bancaria.
+3. Administración debe verificar el CBU/alias de Merlo Ya y establecer tarifas comerciales reales.
+4. Crear una cuenta de usuario para cada repartidor y habilitarla desde el panel de administración.
+5. Configurar `APP_ORIGIN` con el dominio web final y `ROUTING_BASE_URL` con un servicio de rutas con disponibilidad adecuada. El fallback público de OSRM es solo para pruebas.
+6. Revisar confirmación de email, URL de redirección y políticas de Auth.
+7. Activar Leaked Password Protection en Supabase Auth; el asesor de seguridad informa que actualmente está desactivado.
+8. Completar una prueba end-to-end autenticada para delivery y pickup, incluyendo carga y revisión de comprobantes.
+9. No fusionar el PR ni promover a producción hasta completar lo anterior.
 
-- Cliente no autenticado: checkout devuelve 401.
-- Cuenta sin rol cliente: checkout devuelve 403.
-- Producto inexistente o cantidad inválida: checkout se rechaza.
-- Carrito con dos comercios: crea un pedido, dos subpedidos y sus transferencias correspondientes.
-- Dos llamadas simultáneas con la misma clave y payload: existe un único pedido.
-- Misma clave con payload diferente: devuelve conflicto y no crea otro pedido.
-- Error durante la inserción de ítems o pagos: la transacción completa hace rollback.
-- Cliente carga JPG, PNG y PDF de hasta 5 MB; un archivo mayor o MIME no permitido se rechaza.
-- Cliente no puede cargar comprobantes en pedidos ajenos.
-- Comercio solo puede verificar/rechazar su propia transferencia.
-- Comercio no puede revisar la transferencia de delivery ni la de otro comercio.
-- Administración puede revisar ambas clases de transferencia.
-- Pedido queda confirmado únicamente cuando todas las transferencias están verificadas.
-- Administración puede asignar un pedido confirmado a un perfil repartidor.
-- El repartidor solo ve sus entregas y puede pasar de asignado a retirado y de retirado a entregado.
-- El cliente puede consultar el estado de entrega desde el historial de pedidos.
-- Archivos de comprobantes no son accesibles sin autorización; los enlaces firmados expiran.
+## Datos de demostración y límites
 
-## Límites actuales
-
-- No se procesa dinero automáticamente: el pago es por transferencia y revisión humana.
-- La asignación manual de repartidores y los estados asignado/retirado/entregado están implementados con actualización transaccional; no hay tracking GPS en tiempo real.
-- El retiro por parte del cliente en el comercio todavía no está implementado en el checkout.
-- Los perfiles con rol `repartidor` deben ser habilitados por administración; no existe alta pública de repartidores.
-- El rol `repartidor` está permitido por la restricción de perfiles, pero no puede ser elegido desde el registro público.
-- La migración de hardening elimina la lectura/inserción pública de perfiles, restringe las columnas expuestas, limita ventas heredadas y exige rol comercio para modificar productos.
-- No se ha ejecutado una prueba real contra staging, porque el repositorio no proporciona acceso administrativo ni secretos de Supabase/Vercel.
-- No se debe fusionar a `main` ni desplegar a producción hasta completar las pruebas anteriores y revisar las tarifas/destinos bancarios reales.
+- El catálogo conectado contiene un comercio demo y seis productos demo.
+- Los pedidos demo no generan transferencias reales; no deben utilizarse como prueba de cobro.
+- Los pagos reales son transferencias bancarias manuales, con verificación humana.
+- La asignación de repartidores es manual; no hay tracking GPS en vivo.
+- La notificación WhatsApp no se envía automáticamente: se abre el chat de Merlo Ya y el usuario confirma el envío.
